@@ -11,7 +11,6 @@ The Rust guard binaries own their own roadmaps (`comment-checker/docs/roadmap.md
 
 | # | Item | Status |
 |:-:|:-----|:------|
-| A1 | Consume `extension_test_name_rules` from the path-predicate contract in `isTestPath`; this changes which JVM paths count as tests and needs a small regression sweep. | now |
 | A2 | A complete extension>language section in the upstream contract, replacing the hand-checked alignment in `src/core/diff.ts`. | next |
 | A3 | Per-language regex rules for the languages that currently get language-agnostic rules only (Ruby `end` blocks, Java annotations). | later |
 
