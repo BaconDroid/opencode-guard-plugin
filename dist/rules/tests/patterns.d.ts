@@ -12,6 +12,7 @@ export interface PathPredicateContract {
     readonly test_filename_prefixes: readonly string[];
     readonly test_filename_infixes: readonly string[];
     readonly extension_test_name_rules: readonly ExtensionTestNameRule[];
+    readonly extension_languages: Readonly<Record<string, string>>;
     readonly harness_path_substrings: readonly string[];
     readonly harness_basenames: readonly string[];
     readonly harness_filename_prefixes: readonly string[];

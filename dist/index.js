@@ -918,68 +918,181 @@ class GuardBudget {
 
 // src/core/diff.ts
 import { existsSync as existsSync3, readFileSync as readFileSync2 } from "fs";
-var LANGUAGE_BY_EXTENSION = {
-  ".bash": "bash",
-  ".sh": "bash",
-  ".bats": "bash",
-  ".c": "c",
-  ".h": "c",
-  ".cpp": "cpp",
-  ".cxx": "cpp",
-  ".cc": "cpp",
-  ".hpp": "cpp",
-  ".hxx": "cpp",
-  ".cs": "csharp",
-  ".css": "css",
-  ".cue": "cue",
-  ".dart": "dart",
-  ".dockerfile": "dockerfile",
-  ".ex": "elixir",
-  ".exs": "elixir",
-  ".elm": "elm",
-  ".go": "go",
-  ".groovy": "groovy",
-  ".gradle": "groovy",
-  ".hs": "haskell",
-  ".hcl": "hcl",
-  ".html": "html",
-  ".htm": "html",
-  ".java": "java",
-  ".js": "js",
-  ".jsx": "js",
-  ".mjs": "js",
-  ".cjs": "js",
-  ".kt": "kotlin",
-  ".kts": "kotlin",
-  ".lua": "lua",
-  ".ml": "ocaml",
-  ".php": "php",
-  ".proto": "proto",
-  ".py": "python",
-  ".pyi": "python",
-  ".pyw": "python",
-  ".r": "r",
-  ".rb": "ruby",
-  ".rs": "rust",
-  ".scala": "scala",
-  ".sql": "sql",
-  ".svelte": "svelte",
-  ".swift": "swift",
-  ".toml": "toml",
-  ".ts": "ts",
-  ".tsx": "ts",
-  ".mts": "ts",
-  ".cts": "ts",
-  ".yaml": "yaml",
-  ".yml": "yaml",
-  ".zig": "zig"
+// src/rules/tests/path-predicates.json
+var path_predicates_default = {
+  source: "BaconDroid/test-checker",
+  ref: "39f921041f0fc058283ae5b8da57650892f17ca1",
+  extension_languages: {
+    ".bash": "bash",
+    ".bats": "bash",
+    ".c": "c",
+    ".cc": "cpp",
+    ".cjs": "javascript",
+    ".cpp": "cpp",
+    ".cs": "csharp",
+    ".css": "css",
+    ".cts": "typescript",
+    ".cue": "cue",
+    ".cxx": "cpp",
+    ".dart": "dart",
+    ".dockerfile": "dockerfile",
+    ".elm": "elm",
+    ".ex": "elixir",
+    ".exs": "elixir",
+    ".go": "go",
+    ".gradle": "groovy",
+    ".groovy": "groovy",
+    ".h": "c",
+    ".hcl": "hcl",
+    ".hpp": "cpp",
+    ".hs": "haskell",
+    ".htm": "html",
+    ".html": "html",
+    ".hxx": "cpp",
+    ".java": "java",
+    ".js": "javascript",
+    ".jsx": "javascript",
+    ".kt": "kotlin",
+    ".kts": "kotlin",
+    ".lua": "lua",
+    ".mjs": "javascript",
+    ".ml": "ocaml",
+    ".mts": "typescript",
+    ".php": "php",
+    ".proto": "proto",
+    ".py": "python",
+    ".pyi": "python",
+    ".pyw": "python",
+    ".r": "r",
+    ".rb": "ruby",
+    ".rs": "rust",
+    ".scala": "scala",
+    ".sh": "bash",
+    ".sql": "sql",
+    ".svelte": "svelte",
+    ".swift": "swift",
+    ".toml": "toml",
+    ".ts": "typescript",
+    ".tsx": "tsx",
+    ".yaml": "yaml",
+    ".yml": "yaml",
+    ".zig": "zig"
+  },
+  extension_test_name_rules: [
+    {
+      extensions: [
+        "java",
+        "kt"
+      ],
+      filename_prefixes: [
+        "test"
+      ],
+      filename_suffixes: [
+        "test"
+      ]
+    }
+  ],
+  generated_from: "src/language.rs",
+  harness_basenames: [
+    "pytest.ini",
+    "tox.ini",
+    "conftest.py",
+    "setup.cfg",
+    "pyproject.toml",
+    "package.json",
+    "makefile",
+    "codecov.yml"
+  ],
+  harness_filename_prefixes: [
+    "jest.config",
+    "vitest.config",
+    "karma.conf",
+    ".nycrc"
+  ],
+  harness_path_substrings: [
+    ".github/workflows/",
+    ".gitlab-ci"
+  ],
+  sensitive_harness_basenames: [
+    "pytest.ini",
+    "tox.ini",
+    "conftest.py"
+  ],
+  sensitive_harness_filename_prefixes: [
+    "jest.config",
+    "vitest.config"
+  ],
+  sensitive_harness_path_substrings: [
+    ".github/workflows/",
+    ".gitlab-ci"
+  ],
+  test_filename_infixes: [
+    "_test.",
+    ".test.",
+    ".spec.",
+    "_spec."
+  ],
+  test_filename_prefixes: [
+    "test_",
+    "test-"
+  ],
+  test_path_segments: [
+    "tests",
+    "test",
+    "__tests__",
+    "spec",
+    "specs"
+  ]
+};
+
+// src/core/diff.ts
+var EXTENSION_LANGUAGES = path_predicates_default.extension_languages;
+var LANGUAGE_BY_PACK_NAME = {
+  bash: "bash",
+  c: "c",
+  cpp: "cpp",
+  csharp: "csharp",
+  css: "css",
+  cue: "cue",
+  dart: "dart",
+  dockerfile: "dockerfile",
+  elixir: "elixir",
+  elm: "elm",
+  go: "go",
+  groovy: "groovy",
+  haskell: "haskell",
+  hcl: "hcl",
+  html: "html",
+  java: "java",
+  javascript: "js",
+  kotlin: "kotlin",
+  lua: "lua",
+  ocaml: "ocaml",
+  php: "php",
+  proto: "proto",
+  python: "python",
+  r: "r",
+  ruby: "ruby",
+  rust: "rust",
+  scala: "scala",
+  sql: "sql",
+  svelte: "svelte",
+  swift: "swift",
+  toml: "toml",
+  tsx: "ts",
+  typescript: "ts",
+  yaml: "yaml",
+  zig: "zig"
 };
 function detectLanguage(filePath) {
   const normalized = filePath.replace(/\\/g, "/").toLowerCase();
   const file = normalized.split("/").pop() ?? "";
   const dot = file.lastIndexOf(".");
   const extension = dot >= 0 ? file.slice(dot) : `.${file.replace(/^\.+/, "")}`;
-  return LANGUAGE_BY_EXTENSION[extension] ?? "unknown";
+  const packName = EXTENSION_LANGUAGES[extension];
+  if (!packName)
+    return "unknown";
+  return LANGUAGE_BY_PACK_NAME[packName] ?? "unknown";
 }
 function isSupportedLanguage(language) {
   return language !== "unknown";
@@ -1506,76 +1619,6 @@ function matchPathFilter(patterns, filePath, fallback) {
     return fallback ? matchesAnyGlob(fallback, filePath) : true;
   return matchesAnyGlob(patterns, filePath);
 }
-// src/rules/tests/path-predicates.json
-var path_predicates_default = {
-  source: "BaconDroid/test-checker",
-  ref: "9c983972581f68160fa84d44580ad706b667df3b",
-  extension_test_name_rules: [
-    {
-      extensions: [
-        "java",
-        "kt"
-      ],
-      filename_prefixes: [
-        "test"
-      ],
-      filename_suffixes: [
-        "test"
-      ]
-    }
-  ],
-  generated_from: "src/language.rs",
-  harness_basenames: [
-    "pytest.ini",
-    "tox.ini",
-    "conftest.py",
-    "setup.cfg",
-    "pyproject.toml",
-    "package.json",
-    "makefile",
-    "codecov.yml"
-  ],
-  harness_filename_prefixes: [
-    "jest.config",
-    "vitest.config",
-    "karma.conf",
-    ".nycrc"
-  ],
-  harness_path_substrings: [
-    ".github/workflows/",
-    ".gitlab-ci"
-  ],
-  sensitive_harness_basenames: [
-    "pytest.ini",
-    "tox.ini",
-    "conftest.py"
-  ],
-  sensitive_harness_filename_prefixes: [
-    "jest.config",
-    "vitest.config"
-  ],
-  sensitive_harness_path_substrings: [
-    ".github/workflows/",
-    ".gitlab-ci"
-  ],
-  test_filename_infixes: [
-    "_test.",
-    ".test.",
-    ".spec.",
-    "_spec."
-  ],
-  test_filename_prefixes: [
-    "test_",
-    "test-"
-  ],
-  test_path_segments: [
-    "tests",
-    "test",
-    "__tests__",
-    "spec",
-    "specs"
-  ]
-};
 
 // src/rules/tests/patterns.ts
 var PATH_PREDICATE_CONTRACT = path_predicates_default;

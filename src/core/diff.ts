@@ -5,6 +5,7 @@
 // lines, and net-delta semantics are used for removed vs added.
 
 import { existsSync, readFileSync } from "node:fs"
+import pathPredicateData from "../rules/tests/path-predicates.json"
 
 export type Language =
   | "js"
@@ -43,65 +44,48 @@ export type Language =
   | "zig"
   | "unknown"
 
-// The extension set the bundled test-checker builds parse (TSLP_LANGUAGES in
-// its `.cargo/config.toml`). The plugin classifies only; it ships no parser.
-// Every extension the generated path-predicate contract scopes to a test-name
-// rule maps here; path-predicates.test.ts keeps the two lists aligned.
-export const LANGUAGE_BY_EXTENSION: Readonly<Record<string, Language>> = {
-  ".bash": "bash",
-  ".sh": "bash",
-  ".bats": "bash",
-  ".c": "c",
-  ".h": "c",
-  ".cpp": "cpp",
-  ".cxx": "cpp",
-  ".cc": "cpp",
-  ".hpp": "cpp",
-  ".hxx": "cpp",
-  ".cs": "csharp",
-  ".css": "css",
-  ".cue": "cue",
-  ".dart": "dart",
-  ".dockerfile": "dockerfile",
-  ".ex": "elixir",
-  ".exs": "elixir",
-  ".elm": "elm",
-  ".go": "go",
-  ".groovy": "groovy",
-  ".gradle": "groovy",
-  ".hs": "haskell",
-  ".hcl": "hcl",
-  ".html": "html",
-  ".htm": "html",
-  ".java": "java",
-  ".js": "js",
-  ".jsx": "js",
-  ".mjs": "js",
-  ".cjs": "js",
-  ".kt": "kotlin",
-  ".kts": "kotlin",
-  ".lua": "lua",
-  ".ml": "ocaml",
-  ".php": "php",
-  ".proto": "proto",
-  ".py": "python",
-  ".pyi": "python",
-  ".pyw": "python",
-  ".r": "r",
-  ".rb": "ruby",
-  ".rs": "rust",
-  ".scala": "scala",
-  ".sql": "sql",
-  ".svelte": "svelte",
-  ".swift": "swift",
-  ".toml": "toml",
-  ".ts": "ts",
-  ".tsx": "ts",
-  ".mts": "ts",
-  ".cts": "ts",
-  ".yaml": "yaml",
-  ".yml": "yaml",
-  ".zig": "zig",
+// The pack's vocabulary as the contract publishes it (`extension_languages`), mapped onto this
+// plugin's Language union. The contract is the source of truth for which extension names which
+// language; this table only translates the pack's names. path-predicates.test.ts fails when the
+// contract grows a name this map does not know.
+const EXTENSION_LANGUAGES: Readonly<Record<string, string>> = pathPredicateData.extension_languages
+
+const LANGUAGE_BY_PACK_NAME: Partial<Record<string, Language>> = {
+  bash: "bash",
+  c: "c",
+  cpp: "cpp",
+  csharp: "csharp",
+  css: "css",
+  cue: "cue",
+  dart: "dart",
+  dockerfile: "dockerfile",
+  elixir: "elixir",
+  elm: "elm",
+  go: "go",
+  groovy: "groovy",
+  haskell: "haskell",
+  hcl: "hcl",
+  html: "html",
+  java: "java",
+  javascript: "js",
+  kotlin: "kotlin",
+  lua: "lua",
+  ocaml: "ocaml",
+  php: "php",
+  proto: "proto",
+  python: "python",
+  r: "r",
+  ruby: "ruby",
+  rust: "rust",
+  scala: "scala",
+  sql: "sql",
+  svelte: "svelte",
+  swift: "swift",
+  toml: "toml",
+  tsx: "ts",
+  typescript: "ts",
+  yaml: "yaml",
+  zig: "zig",
 }
 
 export function detectLanguage(filePath: string): Language {
@@ -109,7 +93,9 @@ export function detectLanguage(filePath: string): Language {
   const file = normalized.split("/").pop() ?? ""
   const dot = file.lastIndexOf(".")
   const extension = dot >= 0 ? file.slice(dot) : `.${file.replace(/^\.+/, "")}`
-  return LANGUAGE_BY_EXTENSION[extension] ?? "unknown"
+  const packName = EXTENSION_LANGUAGES[extension]
+  if (!packName) return "unknown"
+  return LANGUAGE_BY_PACK_NAME[packName] ?? "unknown"
 }
 
 export function isSupportedLanguage(language: Language): boolean {
