@@ -189,6 +189,16 @@ test("unknown-test ignores a Rust test that asserts with assert_eq!", () => {
   expect(run(unknownTestRule, change, true)).toHaveLength(0)
 })
 
+test("unknown-test ignores a Rust test whose raw string contains braces", () => {
+  const change = makeChange(
+    "/work/tests/api.rs",
+    "",
+    '#[test]\nfn x() {\n  let input = r#"{"content":"\\"x\\""}"#;\n  assert_eq!(1, 1);\n}\n',
+    { isNew: true },
+  )
+  expect(run(unknownTestRule, change, true)).toHaveLength(0)
+})
+
 test("runTestRules skips rules configured as off", () => {
   const change = makeChange("/work/a.test.ts", "", "it.only('a', () => {})\n", { isNew: true })
   const ctx = makeContext(change)

@@ -809,9 +809,29 @@ function findCommentIndex(line, marker) {
 function maskStrings(text) {
   const chars = text.split("");
   let quote;
+  let rawHashes = -1;
   for (let i = 0;i < chars.length; i++) {
     const char = chars[i];
     if (quote) {
+      if (rawHashes >= 0) {
+        if (char === '"') {
+          let hashes = 0;
+          while (hashes < rawHashes && chars[i + 1 + hashes] === "#")
+            hashes += 1;
+          if (hashes === rawHashes) {
+            for (let k = 0;k <= rawHashes; k++)
+              chars[i + k] = " ";
+            i += rawHashes;
+            quote = undefined;
+            rawHashes = -1;
+            continue;
+          }
+        }
+        if (char !== `
+`)
+          chars[i] = " ";
+        continue;
+      }
       if (char === "\\") {
         chars[i] = " ";
         if (i + 1 < chars.length && chars[i + 1] !== `
@@ -832,6 +852,17 @@ function maskStrings(text) {
     if (char === '"' || char === "'" || char === "`") {
       quote = char;
       chars[i] = " ";
+      continue;
+    }
+    if (char === "r" || char === "b") {
+      const match = /^(?:b?r)(#*)"/.exec(text.slice(i, i + 14));
+      if (match) {
+        rawHashes = match[1].length;
+        quote = '"';
+        for (let k = 0;k < match[0].length; k++)
+          chars[i + k] = " ";
+        i += match[0].length - 1;
+      }
     }
   }
   return chars.join("");
