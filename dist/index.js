@@ -1640,6 +1640,7 @@ var TAUTOLOGICAL_PATTERNS = [
 ];
 var ASSERTION_PATTERNS = [
   /\bassert\b/,
+  /\bassert\w*\s*[!(]/,
   /\bexpect\s*\(/,
   /\bfail\s*\(/,
   /\bverify\s*\(/,
