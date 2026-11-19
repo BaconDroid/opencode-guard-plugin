@@ -43,8 +43,8 @@ export const PATH_PREDICATE_CONTRACT = pathPredicateContract as PathPredicateCon
 
 // Test-path truth, matching test-checker's `is_test_path`: a directory segment,
 // a filename prefix, or a filename infix decides. Extension-scoped class-name
-// rules stay in the contract unconsumed because the predicate exposes the same
-// selection as before: path segment, filename prefix, filename infix.
+// rules (for example Java `*Test`/`*TestCase`) are consumed here so the plugin
+// selects the same files as the binary for those languages.
 export interface TestPathTable {
   readonly directorySegments: readonly string[]
   readonly filenamePrefixes: readonly string[]
@@ -55,6 +55,21 @@ export const TEST_PATH_TABLE: TestPathTable = {
   directorySegments: PATH_PREDICATE_CONTRACT.test_path_segments,
   filenamePrefixes: PATH_PREDICATE_CONTRACT.test_filename_prefixes,
   filenameInfixes: PATH_PREDICATE_CONTRACT.test_filename_infixes,
+}
+
+// Mirrors test-checker's extension-scoped class-name rules (e.g. Java `*Test`).
+function matchesExtensionNameRules(filePath: string): boolean {
+  const normalized = normalizePath(filePath)
+  const file = normalized.split("/").pop() ?? ""
+  const dot = file.lastIndexOf(".")
+  const ext = dot >= 0 ? file.slice(dot + 1) : ""
+
+  for (const rule of PATH_PREDICATE_CONTRACT.extension_test_name_rules) {
+    if (!rule.extensions.includes(ext)) continue
+    if (rule.filename_prefixes.some(prefix => file.startsWith(prefix))) return true
+    if (rule.filename_suffixes.some(suffix => file.endsWith(suffix))) return true
+  }
+  return false
 }
 
 // `test_patterns` is an override; an empty list selects the built-in table.
@@ -102,7 +117,8 @@ export function matchesTestPathTable(filePath: string, table: TestPathTable = TE
   return (
     normalized.split("/").some(segment => table.directorySegments.includes(segment)) ||
     table.filenamePrefixes.some(prefix => file.startsWith(prefix)) ||
-    table.filenameInfixes.some(infix => file.includes(infix))
+    table.filenameInfixes.some(infix => file.includes(infix)) ||
+    matchesExtensionNameRules(filePath)
   )
 }
 

@@ -11,10 +11,9 @@ The Rust guard binaries own their own roadmaps (`comment-checker/docs/roadmap.md
 
 | # | Item | Status |
 |:-:|:-----|:------|
-| A1 | Rule-id contract check compares the rule ids instead of the pinned test-checker ref, so an unrelated sibling commit stops reporting drift. | next |
-| A2 | `extension_test_name_rules` from the path-predicate contract is carried but not consumed by `isTestPath`; consuming it changes which JVM paths count as tests. | later |
-| A3 | A complete extension>language section in the upstream contract, replacing the hand-checked alignment in `src/core/diff.ts`. | later |
-| A4 | Per-language regex rules for the languages that currently get language-agnostic rules only (Ruby `end` blocks, Java annotations). | later |
+| A1 | Consume `extension_test_name_rules` from the path-predicate contract in `isTestPath`; this changes which JVM paths count as tests and needs a small regression sweep. | now |
+| A2 | A complete extension>language section in the upstream contract, replacing the hand-checked alignment in `src/core/diff.ts`. | next |
+| A3 | Per-language regex rules for the languages that currently get language-agnostic rules only (Ruby `end` blocks, Java annotations). | later |
 
 ## Block B - Analyzers
 
@@ -28,4 +27,3 @@ The Rust guard binaries own their own roadmaps (`comment-checker/docs/roadmap.md
 | # | Item | Status |
 |:-:|:-----|:------|
 | C1 | The binary cache directory keeps the pre-rename `opencode-comments-plugin` name so existing caches are not orphaned; rename when a migration step exists. | later |
-| C2 | No npm publication. Install is from git; `package.json` stays `private`. | done |

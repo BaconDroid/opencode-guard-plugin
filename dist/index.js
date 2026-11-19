@@ -11,7 +11,7 @@ var DEFAULT_TRIGGER_TOOLS = ["write", "edit", "apply_patch"];
 var DEFAULT_CLI_TIMEOUT_MS = 5000;
 var DEFAULT_DEDUP_WINDOW_MS = 30000;
 var COMMENT_CHECKER_BINARY_NAME = process.platform === "win32" ? "comment-checker.exe" : "comment-checker";
-var COMMENT_CHECKER_FALLBACK_VERSION = "0.8.0";
+var COMMENT_CHECKER_FALLBACK_VERSION = "0.9.0";
 
 // src/cli.ts
 import { existsSync as existsSync2 } from "fs";
@@ -1553,6 +1553,21 @@ var TEST_PATH_TABLE = {
   filenamePrefixes: PATH_PREDICATE_CONTRACT.test_filename_prefixes,
   filenameInfixes: PATH_PREDICATE_CONTRACT.test_filename_infixes
 };
+function matchesExtensionNameRules(filePath) {
+  const normalized = normalizePath(filePath);
+  const file = normalized.split("/").pop() ?? "";
+  const dot = file.lastIndexOf(".");
+  const ext = dot >= 0 ? file.slice(dot + 1) : "";
+  for (const rule of PATH_PREDICATE_CONTRACT.extension_test_name_rules) {
+    if (!rule.extensions.includes(ext))
+      continue;
+    if (rule.filename_prefixes.some((prefix) => file.startsWith(prefix)))
+      return true;
+    if (rule.filename_suffixes.some((suffix) => file.endsWith(suffix)))
+      return true;
+  }
+  return false;
+}
 var DEFAULT_TEST_PATTERNS = [];
 var HARNESS_PATH_TABLE = {
   pathSubstrings: PATH_PREDICATE_CONTRACT.harness_path_substrings,
@@ -1571,7 +1586,7 @@ function normalizePath(filePath) {
 function matchesTestPathTable(filePath, table = TEST_PATH_TABLE) {
   const normalized = normalizePath(filePath);
   const file = normalized.split("/").pop() ?? "";
-  return normalized.split("/").some((segment) => table.directorySegments.includes(segment)) || table.filenamePrefixes.some((prefix) => file.startsWith(prefix)) || table.filenameInfixes.some((infix) => file.includes(infix));
+  return normalized.split("/").some((segment) => table.directorySegments.includes(segment)) || table.filenamePrefixes.some((prefix) => file.startsWith(prefix)) || table.filenameInfixes.some((infix) => file.includes(infix)) || matchesExtensionNameRules(filePath);
 }
 function matchesHarnessPathTable(filePath, table) {
   const normalized = normalizePath(filePath);

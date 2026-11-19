@@ -7,16 +7,13 @@ docstrings are added (wrapping the `comment-checker` CLI from
 `BaconDroid/comment-checker`) and ships a deterministic test guard that
 discourages weakened tests. Both surface their findings in tool output.
 
-## Origin and credits
+## Origin
 
 The comment guard derives from the comment-checker hook in
 [oh-my-opencode](https://github.com/code-yeongyu/oh-my-opencode), through
 [`ajoslin/opencode-comments-plugin`](https://github.com/ajoslin/opencode-comments-plugin).
 This is an independent project maintained by BaconDroid; the test guard, the
 audit tooling and the opt-in analyzers are original work.
-
-Credit to [oh-my-opencode](https://github.com/code-yeongyu/oh-my-opencode) for the hook integration,
-and to [ajoslin/opencode-comments-plugin](https://github.com/ajoslin/opencode-comments-plugin) for the plugin this project derives from.
 
 ## Install
 
@@ -235,13 +232,13 @@ unchecked and the wrapper stays silent. The plugin never shells out by name, so
 a stale `PATH` cannot change which engine it uses.
 
 Rule ids are a generated contract with the binary. `src/rules/tests/binary-rule-ids.json`
-is rewritten from the test-checker README `## Rules` paragraph (33 ids at tc
-`60e58e0`) by `node scripts/generate-rule-ids.mjs`; point `TC_REPO` at a current
-checkout when the default `../test-checker` is stale or absent. Every binary id
-is enabled at `warn` because the binary has already applied its own confidence
-gate. `npm run check:rule-ids` compares the parsed id set and exits non-zero only
-when an id is added, removed or renamed, so a tc bump that leaves the ids intact
-does not demand a contract refresh.
+is rewritten from the test-checker README `## Rules` paragraph by
+`node scripts/generate-rule-ids.mjs`; point `TC_REPO` at a current checkout when
+the default `../test-checker` is stale or absent. Every binary id is enabled at
+`warn` because the binary has already applied its own confidence gate. `npm run
+check:rule-ids` compares the parsed id set and exits non-zero only when an id is
+added, removed or renamed, so a tc bump that leaves the ids intact does not demand
+a contract refresh.
 
 Older regex ids keep working through these aliases. An explicit legacy override
 applies to every listed binary id unless that id is configured itself:
