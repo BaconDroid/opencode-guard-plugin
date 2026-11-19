@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
-import { LANGUAGE_BY_EXTENSION } from "../../core/diff"
+import { detectLanguage, type Language } from "../../core/diff"
 import pathPredicateData from "./path-predicates.json"
 import {
   HARNESS_PATH_TABLE,
@@ -39,11 +39,44 @@ test("the exported tables are read from the generated contract", () => {
   )
 })
 
-test("every extension-scoped test-name rule has a language mapping", () => {
+test("detectLanguage reproduces the hand-checked matrix the contract replaced", () => {
+  // The oracle is the pre-contract LANGUAGE_BY_EXTENSION table (the TSLP_LANGUAGES coverage), so
+  // a contract or alias change that reclassifies an extension fails here.
+  const expected: ReadonlyArray<readonly [string, Language]> = [
+    [".bash", "bash"], [".sh", "bash"], [".bats", "bash"], [".c", "c"], [".h", "c"],
+    [".cpp", "cpp"], [".cxx", "cpp"], [".cc", "cpp"], [".hpp", "cpp"], [".hxx", "cpp"],
+    [".cs", "csharp"], [".css", "css"], [".cue", "cue"], [".dart", "dart"],
+    [".dockerfile", "dockerfile"], [".ex", "elixir"], [".exs", "elixir"], [".elm", "elm"],
+    [".go", "go"], [".groovy", "groovy"], [".gradle", "groovy"], [".hs", "haskell"],
+    [".hcl", "hcl"], [".html", "html"], [".htm", "html"], [".java", "java"], [".js", "js"],
+    [".jsx", "js"], [".mjs", "js"], [".cjs", "js"], [".kt", "kotlin"], [".kts", "kotlin"],
+    [".lua", "lua"], [".ml", "ocaml"], [".php", "php"], [".proto", "proto"], [".py", "python"],
+    [".pyi", "python"], [".pyw", "python"], [".r", "r"], [".rb", "ruby"], [".rs", "rust"],
+    [".scala", "scala"], [".sql", "sql"], [".svelte", "svelte"], [".swift", "swift"],
+    [".toml", "toml"], [".ts", "ts"], [".tsx", "ts"], [".mts", "ts"], [".cts", "ts"],
+    [".yaml", "yaml"], [".yml", "yaml"], [".zig", "zig"],
+  ]
+  expect(expected.length).toBe(54)
+  for (const [extension, language] of expected) {
+    expect(detectLanguage(`fixture${extension}`)).toBe(language)
+  }
+})
+
+test("every extension the contract publishes resolves to a known language", () => {
+  // A pack rename or a new language lands in the contract first; until LANGUAGE_BY_PACK_NAME
+  // names it, detectLanguage would silently return "unknown" - fail here instead.
+  const extensions = Object.keys(pathPredicateData.extension_languages)
+  expect(extensions.length).toBe(54)
+  for (const extension of extensions) {
+    expect(detectLanguage(`fixture${extension}`)).not.toBe("unknown")
+  }
+})
+
+test("every extension-scoped test-name rule resolves to a known language", () => {
   const extensions = pathPredicateData.extension_test_name_rules.flatMap(rule => rule.extensions)
   expect(extensions.length).toBeGreaterThan(0)
   for (const extension of extensions) {
-    expect(LANGUAGE_BY_EXTENSION[`.${extension}`]).toBeDefined()
+    expect(detectLanguage(`fixture.${extension}`)).not.toBe("unknown")
   }
 })
 

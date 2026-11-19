@@ -50,6 +50,17 @@ export function parsePathPredicateContract(text) {
       }
     }
   }
+  const languages = contract.extension_languages
+  if (typeof languages !== "object" || languages === null || Array.isArray(languages)) {
+    throw new Error("contract field `extension_languages` is not an object")
+  }
+  for (const [extension, language] of Object.entries(languages)) {
+    if (!extension.startsWith(".") || typeof language !== "string" || language.length === 0) {
+      throw new Error(
+        `extension_languages[${JSON.stringify(extension)}] is not an extension to language pair`,
+      )
+    }
+  }
   return contract
 }
 
