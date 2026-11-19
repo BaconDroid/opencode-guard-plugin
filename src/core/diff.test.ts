@@ -2,7 +2,7 @@ import { test, expect } from "bun:test"
 import { mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { changeTextsFromTool, detectLanguage, diffLines, extractToolChange, readFileIfExists, type Language } from "./diff"
+import { changeTextsFromTool, detectLanguage, diffLines, extractToolChange, maskStrings, readFileIfExists, type Language } from "./diff"
 
 test("readFileIfExists returns the file content", () => {
   const dir = mkdtempSync(join(tmpdir(), "guard-preimage-"))
@@ -19,6 +19,14 @@ test("diffLines reports only net-new and net-removed lines", () => {
   const { added, removed } = diffLines("a\nb\nc\n", "a\nb\nc\nd\n")
   expect(added).toEqual(["d"])
   expect(removed).toEqual([])
+})
+
+test("maskStrings hides braces inside a Rust raw string and keeps length", () => {
+  const text = 'r#"{"a":"\\"b"}"#'
+  const masked = maskStrings(text)
+  expect(masked).toHaveLength(text.length)
+  expect(masked).not.toContain("{")
+  expect(masked).not.toContain("}")
 })
 
 test("changeTextsFromTool derives write texts from content and preimage", () => {

@@ -200,6 +200,7 @@ export const TAUTOLOGICAL_PATTERNS: RegExp[] = [
 // jest/expect-expect + SonarJS S2699: a test must contain an assertion.
 export const ASSERTION_PATTERNS: RegExp[] = [
   /\bassert\b/,
+  /\bassert\w*\s*[!(]/,
   /\bexpect\s*\(/,
   /\bfail\s*\(/,
   /\bverify\s*\(/,

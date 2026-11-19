@@ -265,12 +265,31 @@ function findCommentIndex(line: string, marker: string): number {
 
 // Replaces string-literal characters with spaces while preserving length and
 // newlines, so offsets/line numbers stay valid for structure detection.
+// Rust raw strings (r"...", r#"..."#, br#"..."#) are tracked explicitly: their
+// quotes do not delimit normally, so a JSON fixture inside r#"..."# would
+// otherwise alternate mask/unmask and leak braces into structure detection.
 export function maskStrings(text: string): string {
   const chars = text.split("")
   let quote: string | undefined
+  let rawHashes = -1
   for (let i = 0; i < chars.length; i++) {
     const char = chars[i]!
     if (quote) {
+      if (rawHashes >= 0) {
+        if (char === '"') {
+          let hashes = 0
+          while (hashes < rawHashes && chars[i + 1 + hashes] === "#") hashes += 1
+          if (hashes === rawHashes) {
+            for (let k = 0; k <= rawHashes; k++) chars[i + k] = " "
+            i += rawHashes
+            quote = undefined
+            rawHashes = -1
+            continue
+          }
+        }
+        if (char !== "\n") chars[i] = " "
+        continue
+      }
       if (char === "\\") {
         chars[i] = " "
         if (i + 1 < chars.length && chars[i + 1] !== "\n") chars[i + 1] = " "
@@ -288,6 +307,16 @@ export function maskStrings(text: string): string {
     if (char === '"' || char === "'" || char === "`") {
       quote = char
       chars[i] = " "
+      continue
+    }
+    if (char === "r" || char === "b") {
+      const match = /^(?:b?r)(#*)"/.exec(text.slice(i, i + 14))
+      if (match) {
+        rawHashes = match[1]!.length
+        quote = '"'
+        for (let k = 0; k < match[0].length; k++) chars[i + k] = " "
+        i += match[0].length - 1
+      }
     }
   }
   return chars.join("")
