@@ -1805,11 +1805,17 @@ var TEST_DECLARATION_PATTERNS = {
   ts: /(?:^|[^\w.])(?:it|test|describe)(?:\.(?:skip|only|todo|each|concurrent))?\s*\(/,
   python: /^\s*(?:async\s+)?def\s+test_\w*\s*\(/,
   go: /^\s*func\s+Test\w*\s*\(/,
-  rust: /#\[test\]/
+  rust: /#\[test\]/,
+  ruby: /^\s*(?:(?:it|specify|test)(?=[\s(]).*\bdo\b\s*(?:\|[^|]*\|)?\s*$|def\s+test_\w*)/,
+  java: /@(?:Test|ParameterizedTest|RepeatedTest|TestFactory|TestTemplate)\b/
+};
+var LANGUAGE_ASSERTION_PATTERNS = {
+  ruby: [/\bassert\w*/, /\brefute\w*/, /\bexpect\b/, /\bis_expected\b/, /\braise_error\b/]
 };
 var PLACEHOLDER_PATTERN = /^(?:<replace:[^>]+>|placeholder|todo|tbd|n\/a|stub)$/i;
-function hasAssertion(text) {
-  return ASSERTION_PATTERNS.some((pattern) => pattern.test(text));
+function hasAssertion(text, language) {
+  const specific = language && LANGUAGE_ASSERTION_PATTERNS[language] || [];
+  return ASSERTION_PATTERNS.some((pattern) => pattern.test(text)) || specific.some((pattern) => pattern.test(text));
 }
 function countAssertions(lines) {
   let count = 0;
@@ -1868,6 +1874,51 @@ function withinAllowWindow(text, line, matchers, window = BYPASS_WINDOW) {
     if (matchers.allow.test(lines[i] ?? ""))
       return true;
   return false;
+}
+
+// src/rules/tests/end-blocks.ts
+var LEADING_OPENER = /^\s*(?:if|unless|while|until|case|begin|class|module|for)\b/;
+var DEF_OPENER = /^\s*def\b/;
+var ENDLESS_DEF = /^\s*def\s+[\w.?!]+(?:\([^)]*\))?\s*=(?![=~>])/;
+var ASSIGNED_OPENER = /[=(]\s*(?:if|unless|while|until|case|begin)\b/;
+var LOOP_OPENER = /^\s*(?:while|until|for)\b/;
+var DO_KEYWORD = /(?<![\w.:@$])do\b(?![?!]|\s*:(?!:))/g;
+var END_KEYWORD = /(?<![\w.:@$]|^=)end\b(?![?!]|\s*:(?!:))/g;
+function countMatches(line, pattern) {
+  return line.match(pattern)?.length ?? 0;
+}
+function rubyDepthDelta(line) {
+  let opens = 0;
+  if (LEADING_OPENER.test(line))
+    opens += 1;
+  else if (DEF_OPENER.test(line) && !ENDLESS_DEF.test(line))
+    opens += 1;
+  else if (ASSIGNED_OPENER.test(line))
+    opens += 1;
+  const doCount = countMatches(line, DO_KEYWORD);
+  opens += LOOP_OPENER.test(line) ? Math.max(0, doCount - 1) : doCount;
+  return opens - countMatches(line, END_KEYWORD);
+}
+function findEndBlocks(lines, searchableLines, declaration) {
+  const blocks = [];
+  for (let i = 0;i < searchableLines.length; i++) {
+    if (!declaration.test(searchableLines[i]))
+      continue;
+    let depth = 0;
+    let close = -1;
+    for (let j = i;j < searchableLines.length; j++) {
+      depth += rubyDepthDelta(searchableLines[j]);
+      if (depth <= 0) {
+        close = j;
+        break;
+      }
+    }
+    if (close < 0)
+      continue;
+    blocks.push({ startLine: i + 1, endLine: close + 1, lines: lines.slice(i + 1, close) });
+    i = close;
+  }
+  return blocks;
 }
 
 // src/rules/tests/content.ts
@@ -2045,7 +2096,11 @@ function findTestBlocks(text, language) {
     return findPythonBlocks(stripped.split(`
 `), searchable.split(`
 `), declaration);
-  return findBraceBlocks(searchable, stripped, declaration);
+  if (language === "ruby")
+    return findEndBlocks(stripped.split(`
+`), searchable.split(`
+`), declaration);
+  return findBraceBlocks(searchable, stripped, declaration, language === "java" ? methodOpenBrace : plainOpenBrace);
 }
 function findPythonBlocks(lines, searchableLines, declaration) {
   const blocks = [];
@@ -2071,12 +2126,30 @@ function findPythonBlocks(lines, searchableLines, declaration) {
   }
   return blocks;
 }
-function findBraceBlocks(searchable, content, declaration) {
+function plainOpenBrace(searchable, from) {
+  return searchable.indexOf("{", from);
+}
+function methodOpenBrace(searchable, from) {
+  let parens = 0;
+  for (let i = from;i < searchable.length; i++) {
+    const char = searchable[i];
+    if (char === "(")
+      parens += 1;
+    else if (char === ")")
+      parens -= 1;
+    else if (parens <= 0 && char === ";")
+      return -1;
+    else if (parens <= 0 && char === "{")
+      return i;
+  }
+  return -1;
+}
+function findBraceBlocks(searchable, content, declaration, findOpenBrace) {
   const blocks = [];
   const global = new RegExp(declaration.source, "gm");
   let match;
   while ((match = global.exec(searchable)) !== null) {
-    const openIndex = searchable.indexOf("{", match.index);
+    const openIndex = findOpenBrace(searchable, match.index);
     if (openIndex < 0)
       continue;
     const closeIndex = matchBrace(searchable, openIndex);
@@ -2162,7 +2235,7 @@ var unknownTestRule = {
 `);
       if (countRealLines(body, ctx.change.language) === 0)
         continue;
-      if (hasAssertion(body))
+      if (hasAssertion(body, ctx.change.language))
         continue;
       findings.push({
         rule: "unknown-test",
