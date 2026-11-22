@@ -11,7 +11,6 @@ The Rust guard binaries own their own roadmaps (`comment-checker/docs/roadmap.md
 
 | # | Item | Status |
 |:-:|:-----|:------|
-| A3 | Per-language regex rules for the languages that currently get language-agnostic rules only (Ruby `end` blocks, Java annotations). | later |
 
 ## Block B - Analyzers
 
