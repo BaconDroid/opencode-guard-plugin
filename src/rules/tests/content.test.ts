@@ -8,6 +8,7 @@ import {
   emptyTestRule,
   expectedFromSUTRule,
   findCrossFileDuplicates,
+  findTestBlocks,
   forcedSuccessRule,
   guttedTestRule,
   matcherLoosenedRule,
@@ -197,6 +198,127 @@ test("unknown-test ignores a Rust test whose raw string contains braces", () => 
     { isNew: true },
   )
   expect(run(unknownTestRule, change, true)).toHaveLength(0)
+})
+
+test("unknown-test flags a Ruby spec without an assertion and balances nested end blocks", () => {
+  const text = [
+    "describe Calc do",
+    "  it 'adds' do",
+    "    if ready?",
+    "      setup",
+    "    end",
+    "    [1, 2].each do |n|",
+    "      total += n",
+    "    end",
+    "  end",
+    "end",
+    "",
+  ].join("\n")
+  const change = makeChange("/work/spec/calc_spec.rb", "", text, { isNew: true })
+  const findings = run(unknownTestRule, change, true)
+  expect(findings).toHaveLength(1)
+  expect(findings[0]!.line).toBe(2)
+})
+
+test("unknown-test ignores a Ruby spec with an assertion after nested end blocks", () => {
+  const text = [
+    "describe Calc do",
+    "  it 'adds' do",
+    "    if ready?",
+    "      setup",
+    "    end",
+    "    expect(total).to eq(3)",
+    "  end",
+    "end",
+    "",
+  ].join("\n")
+  const change = makeChange("/work/spec/calc_spec.rb", "", text, { isNew: true })
+  expect(run(unknownTestRule, change, true)).toHaveLength(0)
+})
+
+test("unknown-test ignores a Ruby Minitest method that asserts without parentheses", () => {
+  const text = "class CalcTest < Minitest::Test\n  def test_add\n    assert_equal 3, add(1, 2)\n  end\nend\n"
+  const change = makeChange("/work/test/calc_test.rb", "", text, { isNew: true })
+  expect(run(unknownTestRule, change, true)).toHaveLength(0)
+})
+
+test("findTestBlocks closes a Ruby block on its own end and keeps following examples separate", () => {
+  const text = [
+    "it 'a' do",
+    "  if x",
+    "    y",
+    "  end",
+    "  z = foo do |v|",
+    "    v",
+    "  end",
+    "end",
+    "specify 'b' do",
+    "  expect(1).to eq(1)",
+    "end",
+    "",
+  ].join("\n")
+  const blocks = findTestBlocks(text, "ruby")
+  expect(blocks.map(block => [block.startLine, block.endLine])).toEqual([[1, 8], [9, 11]])
+  expect(blocks[1]!.lines).toEqual(["  expect(1).to eq(1)"])
+})
+
+test("findTestBlocks ignores Ruby end markers in strings, symbols, and modifier conditions", () => {
+  const text = "it 'a' do\n  run 'x end' if ready\n  call(:end, end: 1, do: 2)\n  expect(1).to eq(1)\nend\n"
+  const blocks = findTestBlocks(text, "ruby")
+  expect(blocks.map(block => [block.startLine, block.endLine])).toEqual([[1, 5]])
+})
+
+test("unknown-test flags a Java JUnit method without an assertion despite nested braces", () => {
+  const text = [
+    "class CalcTest {",
+    "  @Test",
+    "  void adds() {",
+    "    if (ready) {",
+    "      setup();",
+    "    }",
+    "    total();",
+    "  }",
+    "}",
+    "",
+  ].join("\n")
+  const change = makeChange("/work/src/test/java/CalcTest.java", "", text, { isNew: true })
+  const findings = run(unknownTestRule, change, true)
+  expect(findings).toHaveLength(1)
+  expect(findings[0]!.line).toBe(3)
+})
+
+test("unknown-test ignores a Java JUnit method with assertEquals after nested braces", () => {
+  const text = [
+    "class CalcTest {",
+    "  @Test",
+    "  void adds() {",
+    "    if (ready) {",
+    "      setup();",
+    "    }",
+    "    assertEquals(3, total());",
+    "  }",
+    "}",
+    "",
+  ].join("\n")
+  const change = makeChange("/work/src/test/java/CalcTest.java", "", text, { isNew: true })
+  expect(run(unknownTestRule, change, true)).toHaveLength(0)
+})
+
+test("findTestBlocks takes the Java method body, not braces inside annotation arguments", () => {
+  const text = [
+    "class CalcTest {",
+    "  @ParameterizedTest",
+    '  @ValueSource(strings = {"a", "b"})',
+    "  void adds(String s) {",
+    "    assertNotNull(s);",
+    "  }",
+    "}",
+    "",
+  ].join("\n")
+  const blocks = findTestBlocks(text, "java")
+  expect(blocks).toHaveLength(1)
+  expect(blocks[0]!.startLine).toBe(4)
+  expect(blocks[0]!.lines.join("\n")).toContain("assertNotNull")
 })
 
 test("runTestRules skips rules configured as off", () => {

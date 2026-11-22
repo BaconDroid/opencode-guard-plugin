@@ -459,6 +459,10 @@ no-op rather than a failure.
 
 The regex rule tables cover Python, JS/TS, Rust and Go (ported from tamperguard
 MIT, tampercheck Apache-2.0, pr-test-guard MIT and veredicto up to v0.3.3).
+Ruby and Java get test-block extraction only: Ruby `it`/`specify`/`test ... do`
+blocks and `def test_*` methods that close with `end`, and JUnit `@Test`-style
+methods with brace bodies, so the body rules (`empty-test`, `unknown-test`,
+`assertion-roulette`, `duplicate-test`) run on them.
 Language detection covers every extension the bundled `test-checker` builds
 parse - 35 languages including Ruby, Java, C#, PHP, Kotlin, Swift, Scala,
 Elixir, Lua, C, C++, Groovy, OCaml, Elm and Bats - so audit, CI and cleanup

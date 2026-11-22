@@ -324,12 +324,24 @@ export const TEST_DECLARATION_PATTERNS: Partial<Record<Language, RegExp>> = {
   python: /^\s*(?:async\s+)?def\s+test_\w*\s*\(/,
   go: /^\s*func\s+Test\w*\s*\(/,
   rust: /#\[test\]/,
+  // RSpec/Minitest blocks close with `end`; `it { ... }` one-liners carry no
+  // `do` and are not matched. `def test_*` covers Minitest methods.
+  ruby: /^\s*(?:(?:it|specify|test)(?=[\s(]).*\bdo\b\s*(?:\|[^|]*\|)?\s*$|def\s+test_\w*)/,
+  // JUnit 4/5 test annotations; the method body is the brace block after them.
+  java: /@(?:Test|ParameterizedTest|RepeatedTest|TestFactory|TestTemplate)\b/,
+}
+
+// Assertion forms the shared ASSERTION_PATTERNS miss in a language: Ruby calls
+// assertions without parentheses (`assert_equal 1, x`, `expect { ... }.to`).
+export const LANGUAGE_ASSERTION_PATTERNS: Partial<Record<Language, RegExp[]>> = {
+  ruby: [/\bassert\w*/, /\brefute\w*/, /\bexpect\b/, /\bis_expected\b/, /\braise_error\b/],
 }
 
 export const PLACEHOLDER_PATTERN = /^(?:<replace:[^>]+>|placeholder|todo|tbd|n\/a|stub)$/i
 
-export function hasAssertion(text: string): boolean {
-  return ASSERTION_PATTERNS.some(pattern => pattern.test(text))
+export function hasAssertion(text: string, language?: Language): boolean {
+  const specific = (language && LANGUAGE_ASSERTION_PATTERNS[language]) || []
+  return ASSERTION_PATTERNS.some(pattern => pattern.test(text)) || specific.some(pattern => pattern.test(text))
 }
 
 export function countAssertions(lines: string[]): number {

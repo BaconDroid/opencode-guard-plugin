@@ -31,6 +31,7 @@ import {
   hasAssertion,
   isConditionalSkip,
 } from "./patterns"
+import { findEndBlocks } from "./end-blocks"
 import type { RuleContext, RuleFinding, TestBlock, TestRule } from "./types"
 
 export type { Bypass } from "../../core/bypass"
@@ -240,7 +241,8 @@ export function findTestBlocks(text: string, language: Language): TestBlock[] {
   const searchable = maskStrings(stripped)
 
   if (language === "python") return findPythonBlocks(stripped.split("\n"), searchable.split("\n"), declaration)
-  return findBraceBlocks(searchable, stripped, declaration)
+  if (language === "ruby") return findEndBlocks(stripped.split("\n"), searchable.split("\n"), declaration)
+  return findBraceBlocks(searchable, stripped, declaration, language === "java" ? methodOpenBrace : plainOpenBrace)
 }
 
 function findPythonBlocks(lines: string[], searchableLines: string[], declaration: RegExp): TestBlock[] {
@@ -266,12 +268,36 @@ function findPythonBlocks(lines: string[], searchableLines: string[], declaratio
   return blocks
 }
 
-function findBraceBlocks(searchable: string, content: string, declaration: RegExp): TestBlock[] {
+function plainOpenBrace(searchable: string, from: number): number {
+  return searchable.indexOf("{", from)
+}
+
+// A Java test annotation precedes the method signature, and annotation
+// arguments may carry braces (`@ValueSource(strings = {"a"})`). Only a brace
+// outside parentheses opens the method body; a `;` first means no body.
+function methodOpenBrace(searchable: string, from: number): number {
+  let parens = 0
+  for (let i = from; i < searchable.length; i++) {
+    const char = searchable[i]
+    if (char === "(") parens += 1
+    else if (char === ")") parens -= 1
+    else if (parens <= 0 && char === ";") return -1
+    else if (parens <= 0 && char === "{") return i
+  }
+  return -1
+}
+
+function findBraceBlocks(
+  searchable: string,
+  content: string,
+  declaration: RegExp,
+  findOpenBrace: (searchable: string, from: number) => number,
+): TestBlock[] {
   const blocks: TestBlock[] = []
   const global = new RegExp(declaration.source, "gm")
   let match: RegExpExecArray | null
   while ((match = global.exec(searchable)) !== null) {
-    const openIndex = searchable.indexOf("{", match.index)
+    const openIndex = findOpenBrace(searchable, match.index)
     if (openIndex < 0) continue
     const closeIndex = matchBrace(searchable, openIndex)
     if (closeIndex === undefined) continue
@@ -342,7 +368,7 @@ export const unknownTestRule: TestRule = {
       if (!blockIsAdded(ctx, block)) continue
       const body = block.lines.join("\n")
       if (countRealLines(body, ctx.change.language) === 0) continue
-      if (hasAssertion(body)) continue
+      if (hasAssertion(body, ctx.change.language)) continue
       findings.push({
         rule: "unknown-test",
         line: block.startLine,
