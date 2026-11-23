@@ -16,7 +16,7 @@ function unavailableReport(version?: string) {
   }
 }
 
-function capableReport(reportedPolicy?: string) {
+function capableReport(reportedPolicy?: string, stripPolicy: "balanced" | "aggressive" = "balanced") {
   return {
     directory: "/repo",
     files: [
@@ -33,7 +33,7 @@ function capableReport(reportedPolicy?: string) {
     binaryAvailable: true,
     unsupported: false,
     generatedAt,
-    stripPolicy: "balanced" as const,
+    stripPolicy,
     ...(reportedPolicy === undefined ? {} : { reportedPolicy }),
   }
 }
@@ -42,6 +42,11 @@ test("a capable report without a policy suffix says the flag was ignored", () =>
   const rendered = renderCleanup(capableReport())
   expect(rendered).toContain("did not echo a `--strip-policy` level")
   expect(rendered).toContain("`balanced`")
+})
+
+test("a capable report at aggressive needs no note when the flag is ignored", () => {
+  const rendered = renderCleanup(capableReport(undefined, "aggressive"))
+  expect(rendered).not.toContain("--strip-policy")
 })
 
 test("a capable report that ran another policy says so", () => {
