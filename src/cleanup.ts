@@ -8,6 +8,7 @@
 // rewritten instead of failing the command or throwing into the host.
 
 import { tool } from "@opencode-ai/plugin"
+import { spawnSync } from "node:child_process"
 import { existsSync, readFileSync } from "node:fs"
 import { relative } from "node:path"
 import { isSecretFile, listRepositoryFiles } from "./audit"
@@ -24,6 +25,9 @@ const CLEANUP_TIMEOUT_MS = 30_000
 // The binary appends this summary to stderr for every `--strip` run. Its
 // absence is how an older binary (unknown `--strip`) is detected.
 const SUMMARY_MARKER = "[test-checker] cleanup pass:"
+
+// `--strip` first shipped in test-checker 0.4.0 (v0.3.x has no cleanup summary).
+const STRIP_CAPABLE_VERSION = [0, 4, 0]
 const REMOVED_LINE = /^\s+removed: (.+) \[([^\]]+)\]\s*$/
 const KEPT_LINE = /^\s+kept awaiting approval: (.+) \[([^\]]+)\]\s*$/
 const NOTE_LINE = /^\s+note: (.+)\s*$/
@@ -59,6 +63,7 @@ export interface CleanupReport {
   skipped: string[]
   binaryAvailable: boolean
   unsupported: boolean
+  version?: string
   generatedAt: string
 }
 
@@ -158,6 +163,25 @@ function display(filePath: string, directory: string): string {
   return relative(directory, filePath) || filePath
 }
 
+
+function readVersion(binaryPath: string): string | undefined {
+  const result = spawnSync(binaryPath, ["--version"], { encoding: "utf8", timeout: 5_000 })
+  if (result.error || typeof result.stdout !== "string") return undefined
+  const match = /(\d+)\.(\d+)\.(\d+)/.exec(result.stdout)
+  return match ? match[0] : undefined
+}
+
+
+function meetsVersion(version: string, floor: number[]): boolean {
+  const parts = version.split(".").map(Number)
+  for (let index = 0; index < floor.length; index += 1) {
+    const have = parts[index] ?? 0
+    const need = floor[index] ?? 0
+    if (have !== need) return have > need
+  }
+  return true
+}
+
 export async function collectCleanup(options: CleanupOptions, deps: CleanupDeps = {}): Promise<CleanupReport> {
   const directory = options.directory
   const testPatterns = options.testPatterns ?? []
@@ -227,12 +251,18 @@ export async function collectCleanup(options: CleanupOptions, deps: CleanupDeps 
     files.push(file)
   }
 
+  const missingSummary = files.length > 0 && files.every(file => !file.summary && !file.error)
+  // Only a binary that never produced a summary pays the version probe; a capable
+  // binary keeps exactly one invocation per file.
+  const version = missingSummary ? readVersion(binaryPath) : undefined
+
   return {
     directory,
     files,
     skipped,
     binaryAvailable: true,
-    unsupported: files.length > 0 && files.every(file => !file.summary && !file.error),
+    unsupported: missingSummary,
+    version,
     generatedAt: new Date().toISOString(),
   }
 }
@@ -248,6 +278,16 @@ export function renderCleanup(report: CleanupReport): string {
   const kept = report.files.reduce((count, file) => count + file.kept.length, 0)
 
   if (!report.binaryAvailable) {
+    if (report.unsupported && report.version !== undefined) {
+      const belowFloor = !meetsVersion(report.version, STRIP_CAPABLE_VERSION)
+      lines.push(
+        belowFloor
+          ? `test-checker ${report.version} predates \`--strip\`; install test-checker ${STRIP_CAPABLE_VERSION.join(".")} or newer. Nothing was rewritten.`
+          : `test-checker ${report.version} did not report a cleanup pass; nothing was rewritten.`,
+      )
+      appendSkipped(lines, report.skipped)
+      return lines.join("\n")
+    }
     lines.push("No test-checker binary available; nothing was checked or rewritten.")
     appendSkipped(lines, report.skipped)
     return lines.join("\n")
