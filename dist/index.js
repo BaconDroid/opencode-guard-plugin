@@ -4044,6 +4044,7 @@ import { existsSync as existsSync5, readFileSync as readFileSync5 } from "fs";
 import { relative as relative4 } from "path";
 var CLEANUP_TIMEOUT_MS = 30000;
 var SUMMARY_MARKER = "[test-checker] cleanup pass";
+var SUMMARY_LINE = /\[test-checker\] cleanup pass(?: \(([a-z]+)\))?:/;
 var STRIP_CAPABLE_VERSION = [0, 4, 0];
 var REMOVED_LINE = /^\s+removed: (.+) \[([^\]]+)\]\s*$/;
 var KEPT_LINE = /^\s+kept awaiting approval: (.+) \[([^\]]+)\]\s*$/;
@@ -4053,10 +4054,12 @@ function parseCleanupSummary(stderr) {
   const kept = [];
   let note;
   let summary = false;
+  let policy;
   for (const line of stderr.split(`
 `)) {
     if (line.includes(SUMMARY_MARKER)) {
       summary = true;
+      policy = SUMMARY_LINE.exec(line)?.[1] ?? policy;
       continue;
     }
     const removedMatch = REMOVED_LINE.exec(line);
@@ -4075,7 +4078,7 @@ function parseCleanupSummary(stderr) {
         note = noteMatch[1].trim();
     }
   }
-  return { removed, kept, ...note ? { note } : {}, summary };
+  return { removed, kept, ...note ? { note } : {}, summary, ...policy ? { policy } : {} };
 }
 function cleanupPayload(filePath, cwd, content) {
   return {
@@ -4168,7 +4171,8 @@ async function collectCleanup(options, deps = {}) {
       skipped,
       binaryAvailable: false,
       unsupported: false,
-      generatedAt: new Date().toISOString()
+      generatedAt: new Date().toISOString(),
+      stripPolicy: policy
     };
   }
   const files = [];
@@ -4199,9 +4203,12 @@ async function collectCleanup(options, deps = {}) {
     file.summary = parsed.summary;
     if (parsed.note)
       file.note = parsed.note;
+    if (parsed.policy)
+      file.policy = parsed.policy;
     files.push(file);
   }
   const missingSummary = files.length > 0 && files.every((file) => !file.summary && !file.error);
+  const reportedPolicy = files.find((file) => file.policy)?.policy;
   const version = missingSummary ? readVersion(binaryPath) : undefined;
   return {
     directory,
@@ -4210,7 +4217,9 @@ async function collectCleanup(options, deps = {}) {
     binaryAvailable: true,
     unsupported: missingSummary,
     version,
-    generatedAt: new Date().toISOString()
+    generatedAt: new Date().toISOString(),
+    stripPolicy: policy,
+    ...reportedPolicy ? { reportedPolicy } : {}
   };
 }
 function renderCleanup(report) {
@@ -4249,6 +4258,15 @@ function renderCleanup(report) {
   }
   lines.push(`Removed ${removed} test block(s); ${kept} kept awaiting approval across ${report.files.length} test file(s).`);
   lines.push("");
+  if (report.reportedPolicy === undefined) {
+    if (report.stripPolicy !== "aggressive") {
+      lines.push(`The installed test-checker did not echo a \`--strip-policy\` level, so it predates the flag and removed every approved candidate instead of honouring \`${report.stripPolicy}\`. Upgrade it to enforce the configured tier.`);
+      lines.push("");
+    }
+  } else if (report.reportedPolicy !== report.stripPolicy) {
+    lines.push(`The installed test-checker ran \`${report.reportedPolicy}\` although \`${report.stripPolicy}\` was configured.`);
+    lines.push("");
+  }
   if (removed > 0) {
     lines.push(`## Removed (${removed})`);
     lines.push("");

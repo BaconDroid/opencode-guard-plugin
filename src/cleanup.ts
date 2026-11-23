@@ -345,10 +345,14 @@ export function renderCleanup(report: CleanupReport): string {
   lines.push("")
 
   if (report.reportedPolicy === undefined) {
-    lines.push(
-      `The installed test-checker did not echo a \`--strip-policy\` level, so it predates the flag and applied its own default instead of \`${report.stripPolicy}\`. Upgrade it to enforce the configured tier.`,
-    )
-    lines.push("")
+    // A build without the flag removes every approved candidate, which is
+    // `aggressive`; asking for that tier is already what happens.
+    if (report.stripPolicy !== "aggressive") {
+      lines.push(
+        `The installed test-checker did not echo a \`--strip-policy\` level, so it predates the flag and removed every approved candidate instead of honouring \`${report.stripPolicy}\`. Upgrade it to enforce the configured tier.`,
+      )
+      lines.push("")
+    }
   } else if (report.reportedPolicy !== report.stripPolicy) {
     lines.push(
       `The installed test-checker ran \`${report.reportedPolicy}\` although \`${report.stripPolicy}\` was configured.`,

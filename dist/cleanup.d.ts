@@ -10,6 +10,7 @@ export interface CleanupStderrSummary {
     kept: CleanupItem[];
     note?: string;
     summary: boolean;
+    policy?: string;
 }
 export interface CleanupFileReport {
     filePath: string;
@@ -19,6 +20,7 @@ export interface CleanupFileReport {
     summary: boolean;
     note?: string;
     error?: string;
+    policy?: string;
 }
 export interface CleanupReport {
     directory: string;
@@ -28,6 +30,8 @@ export interface CleanupReport {
     unsupported: boolean;
     version?: string;
     generatedAt: string;
+    stripPolicy: StripPolicy;
+    reportedPolicy?: string;
 }
 export type CleanupRun = {
     kind: "output";
