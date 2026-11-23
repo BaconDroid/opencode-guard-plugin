@@ -24,10 +24,11 @@ import type { HookInput } from "./types"
 const CLEANUP_TIMEOUT_MS = 30_000
 
 // The binary appends this summary to stderr for every `--strip` run. Its
-// absence is how an older binary (unknown `--strip`) is detected.
-// The summary gained a ` (<policy>)` suffix when `--strip-policy` shipped, so the
-// marker stops before it.
+// absence is how an older binary (unknown `--strip`) is detected. The summary
+// gained a ` (<policy>)` suffix when `--strip-policy` shipped, so the marker
+// stops before it and the suffix is what proves the binary honoured the flag.
 const SUMMARY_MARKER = "[test-checker] cleanup pass"
+const SUMMARY_LINE = /\[test-checker\] cleanup pass(?: \(([a-z]+)\))?:/
 
 // `--strip` first shipped in test-checker 0.4.0 (v0.3.x has no cleanup summary).
 const STRIP_CAPABLE_VERSION = [0, 4, 0]
@@ -48,6 +49,9 @@ export interface CleanupStderrSummary {
   // False when stderr carried no `[test-checker] cleanup pass:` summary, which
   // is the expected output of a binary that predates `--strip`.
   summary: boolean
+  // The policy the binary named in its summary; absent when it predates
+  // `--strip-policy` and so applied its own default.
+  policy?: string
 }
 
 export interface CleanupFileReport {
@@ -58,6 +62,7 @@ export interface CleanupFileReport {
   summary: boolean
   note?: string
   error?: string
+  policy?: string
 }
 
 export interface CleanupReport {
@@ -68,6 +73,10 @@ export interface CleanupReport {
   unsupported: boolean
   version?: string
   generatedAt: string
+  stripPolicy: StripPolicy
+  // The policy the binary echoed back, when it echoes one at all: a build that
+  // predates `--strip-policy` ignores the flag and reports no level.
+  reportedPolicy?: string
 }
 
 export type CleanupRun =
@@ -96,9 +105,11 @@ export function parseCleanupSummary(stderr: string): CleanupStderrSummary {
   let note: string | undefined
   let summary = false
 
+  let policy: string | undefined
   for (const line of stderr.split("\n")) {
     if (line.includes(SUMMARY_MARKER)) {
       summary = true
+      policy = SUMMARY_LINE.exec(line)?.[1] ?? policy
       continue
     }
     const removedMatch = REMOVED_LINE.exec(line)
@@ -117,7 +128,7 @@ export function parseCleanupSummary(stderr: string): CleanupStderrSummary {
     }
   }
 
-  return { removed, kept, ...(note ? { note } : {}), summary }
+  return { removed, kept, ...(note ? { note } : {}), summary, ...(policy ? { policy } : {}) }
 }
 
 // Same payload shape as the live analyzer's `buildTestCheckerInput`: a whole
@@ -226,6 +237,7 @@ export async function collectCleanup(options: CleanupOptions, deps: CleanupDeps 
       binaryAvailable: false,
       unsupported: false,
       generatedAt: new Date().toISOString(),
+      stripPolicy: policy,
     }
   }
 
@@ -263,10 +275,12 @@ export async function collectCleanup(options: CleanupOptions, deps: CleanupDeps 
     file.kept = parsed.kept
     file.summary = parsed.summary
     if (parsed.note) file.note = parsed.note
+    if (parsed.policy) file.policy = parsed.policy
     files.push(file)
   }
 
   const missingSummary = files.length > 0 && files.every(file => !file.summary && !file.error)
+  const reportedPolicy = files.find(file => file.policy)?.policy
   // Only a binary that never produced a summary pays the version probe; a capable
   // binary keeps exactly one invocation per file.
   const version = missingSummary ? readVersion(binaryPath) : undefined
@@ -279,6 +293,8 @@ export async function collectCleanup(options: CleanupOptions, deps: CleanupDeps 
     unsupported: missingSummary,
     version,
     generatedAt: new Date().toISOString(),
+    stripPolicy: policy,
+    ...(reportedPolicy ? { reportedPolicy } : {}),
   }
 }
 
@@ -327,6 +343,18 @@ export function renderCleanup(report: CleanupReport): string {
     `Removed ${removed} test block(s); ${kept} kept awaiting approval across ${report.files.length} test file(s).`,
   )
   lines.push("")
+
+  if (report.reportedPolicy === undefined) {
+    lines.push(
+      `The installed test-checker did not echo a \`--strip-policy\` level, so it predates the flag and applied its own default instead of \`${report.stripPolicy}\`. Upgrade it to enforce the configured tier.`,
+    )
+    lines.push("")
+  } else if (report.reportedPolicy !== report.stripPolicy) {
+    lines.push(
+      `The installed test-checker ran \`${report.reportedPolicy}\` although \`${report.stripPolicy}\` was configured.`,
+    )
+    lines.push("")
+  }
 
   if (removed > 0) {
     lines.push(`## Removed (${removed})`)

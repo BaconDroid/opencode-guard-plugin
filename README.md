@@ -426,7 +426,10 @@ The flag only has an effect on a `test-checker` build that implements
 `--strip-policy`. The released 0.4.0 ignores the unknown argument and removes
 every approved candidate, which is what `aggressive` asks for and why this
 install's opt-in stays correct on it; `conservative` and `balanced` need the next
-release, or `TC_BINARY` pointed at a build from source.
+release, or `TC_BINARY` pointed at a build from source. A build that ignores the
+flag is called out in the cleanup report instead of silently running its own
+default: the binary echoes the level it used, and a missing or different level
+produces a warning line above the results.
 Harness/config files are selected by the shared gate and listed as skipped
 because `--strip` runs on test bodies. It exits 0 on success, including when
 nothing was approved or removed. A missing binary is reported and treated as a
