@@ -32,7 +32,7 @@ function createDebugLog(prefix, enabled) {
 var COMMENT_CHECKER_EVENT = "PostToolUse";
 var DEFAULT_CLI_TIMEOUT_MS = 5000;
 var COMMENT_CHECKER_BINARY_NAME = process.platform === "win32" ? "comment-checker.exe" : "comment-checker";
-var COMMENT_CHECKER_FALLBACK_VERSION = "0.9.0";
+var COMMENT_CHECKER_FALLBACK_VERSION = "0.10.0";
 
 // src/downloader.ts
 var debugLog = createDebugLog("comment-checker:downloader", process.env.COMMENT_CHECKER_DEBUG === "1");

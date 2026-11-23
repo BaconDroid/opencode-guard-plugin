@@ -11,7 +11,7 @@ var DEFAULT_TRIGGER_TOOLS = ["write", "edit", "apply_patch"];
 var DEFAULT_CLI_TIMEOUT_MS = 5000;
 var DEFAULT_DEDUP_WINDOW_MS = 30000;
 var COMMENT_CHECKER_BINARY_NAME = process.platform === "win32" ? "comment-checker.exe" : "comment-checker";
-var COMMENT_CHECKER_FALLBACK_VERSION = "0.9.0";
+var COMMENT_CHECKER_FALLBACK_VERSION = "0.10.0";
 
 // src/cli.ts
 import { existsSync as existsSync2 } from "fs";
