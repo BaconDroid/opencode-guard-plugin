@@ -422,13 +422,11 @@ takes the low-confidence telemetry such as `echo-test` and
 `mirror-implementation-test`. `guard cleanup --strip-policy <level>` overrides it
 for a single run.
 
-The flag only has an effect on a `test-checker` build that implements
-`--strip-policy`. The released 0.4.0 ignores the unknown argument and removes
-every approved candidate, which is what `aggressive` asks for and why this
-install's opt-in stays correct on it; `conservative` and `balanced` need the next
-release, or `TC_BINARY` pointed at a build from source. A build that ignores the
-flag is called out in the cleanup report instead of silently running its own
-default: the binary echoes the level it used, and a missing or different level
+The flag needs a `test-checker` build that implements `--strip-policy`; 0.5.0 is
+the first release that does. A build without it drops the unknown argument and
+removes every approved candidate, which is `aggressive` but not a narrower tier;
+the cleanup report names that case instead of letting it pass as the configured
+level. The binary echoes the level it applied, so a missing or different level
 produces a warning line above the results.
 Harness/config files are selected by the shared gate and listed as skipped
 because `--strip` runs on test bodies. It exits 0 on success, including when
