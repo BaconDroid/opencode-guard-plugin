@@ -35,7 +35,6 @@ const STRIP_CAPABLE_VERSION = [0, 4, 0]
 const REMOVED_LINE = /^\s+removed: (.+) \[([^\]]+)\]\s*$/
 const KEPT_LINE = /^\s+kept awaiting approval: (.+) \[([^\]]+)\]\s*$/
 const NOTE_LINE = /^\s+note: (.+)\s*$/
-const APPROVAL_HINT = 'a "remove" entry'
 
 export interface CleanupItem {
   name: string

@@ -134,15 +134,6 @@ function validateMutation(record: Record<string, unknown>, path: string, errors:
   rejectUnknown(record, ["enabled", "command", "timeout_ms"], path, errors)
 }
 
-function validateJudge(record: Record<string, unknown>, path: string, errors: string[]): void {
-  if (record.enabled !== undefined && typeof record.enabled !== "boolean") errors.push(`${path}.enabled must be a boolean`)
-  if (record.model !== undefined && asString(record.model) === undefined) errors.push(`${path}.model must be a non-empty string`)
-  if (record.timeout_ms !== undefined && asCount(record.timeout_ms, 1) === undefined) {
-    errors.push(`${path}.timeout_ms must be an integer >= 1`)
-  }
-  rejectUnknown(record, ["enabled", "model", "timeout_ms"], path, errors)
-}
-
 function validateParser(record: Record<string, unknown>, path: string, errors: string[]): void {
   if (record.enabled !== undefined && typeof record.enabled !== "boolean") errors.push(`${path}.enabled must be a boolean`)
   if (record.command !== undefined && asString(record.command) === undefined) errors.push(`${path}.command must be a non-empty string`)
