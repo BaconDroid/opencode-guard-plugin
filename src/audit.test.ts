@@ -145,7 +145,7 @@ test("parseCleanupSummary reads removed, kept and note lines", () => {
       "  removed: same block [duplicate-test]",
       "  kept awaiting approval: taut assertion [tautological-assertion]",
       "  note: the target file is not on disk; nothing was rewritten",
-      '  approve a removal with a "remove" entry ({"glob","rules","reason"}) in .test-checker.json',
+      '  approve a removal with a "remove" entry ({"glob","reasons","reason"}) in .test-checker.json',
     ].join("\n"),
   )
 
