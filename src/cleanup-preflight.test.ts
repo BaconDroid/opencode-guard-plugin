@@ -10,10 +10,49 @@ function unavailableReport(version?: string) {
     skipped: [],
     binaryAvailable: false,
     unsupported: true,
+    stripPolicy: "balanced" as const,
     ...(version === undefined ? {} : { version }),
     generatedAt,
   }
 }
+
+function capableReport(reportedPolicy?: string) {
+  return {
+    directory: "/repo",
+    files: [
+      {
+        filePath: "/repo/a.test.ts",
+        display: "a.test.ts",
+        removed: [{ name: "same", rule: "duplicate-test" }],
+        kept: [],
+        summary: true,
+        ...(reportedPolicy === undefined ? {} : { policy: reportedPolicy }),
+      },
+    ],
+    skipped: [],
+    binaryAvailable: true,
+    unsupported: false,
+    generatedAt,
+    stripPolicy: "balanced" as const,
+    ...(reportedPolicy === undefined ? {} : { reportedPolicy }),
+  }
+}
+
+test("a capable report without a policy suffix says the flag was ignored", () => {
+  const rendered = renderCleanup(capableReport())
+  expect(rendered).toContain("did not echo a `--strip-policy` level")
+  expect(rendered).toContain("`balanced`")
+})
+
+test("a capable report that ran another policy says so", () => {
+  const rendered = renderCleanup(capableReport("aggressive"))
+  expect(rendered).toContain("ran `aggressive` although `balanced` was configured")
+})
+
+test("a capable report that echoed the configured policy adds no note", () => {
+  const rendered = renderCleanup(capableReport("balanced"))
+  expect(rendered).not.toContain("--strip-policy")
+})
 
 test("unsupported report names the version floor for a too-old binary", () => {
   const rendered = renderCleanup(unavailableReport("0.3.1"))
