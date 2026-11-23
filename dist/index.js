@@ -4290,7 +4290,7 @@ function renderCleanup(report) {
       }
     }
     lines.push("");
-    lines.push('Approve a removal with a "remove" entry (`{"glob","rules","reason"}`, reason at least 12 characters) in the git root\'s `.test-checker.json`, then run the cleanup again. The test-checker binary enforces the approval; the plugin never rewrites an unapproved candidate.');
+    lines.push('Approve a removal with a "remove" entry (`{"glob","reasons","reason"}`, reason at least 12 characters) in the git root\'s `.test-checker.json`, then run the cleanup again. The `rules` key is still accepted as the legacy alias. The binary enforces the approval; the plugin never rewrites an unapproved candidate.');
     lines.push("");
   }
   const notes = report.files.filter((file) => file.note);
