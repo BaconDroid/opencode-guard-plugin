@@ -155,6 +155,16 @@ test("parseCleanupSummary reads removed, kept and note lines", () => {
   expect(summary.note).toContain("not on disk")
 })
 
+test("parseCleanupSummary accepts both summary shapes", () => {
+  const released = "[test-checker] cleanup pass: 1 removed, 0 kept awaiting approval.\n  removed: same [duplicate-test]"
+  const withPolicy =
+    "[test-checker] cleanup pass (aggressive): 1 removed, 0 kept awaiting approval.\n  removed: same [duplicate-test]"
+
+  expect(parseCleanupSummary(released).summary).toBe(true)
+  expect(parseCleanupSummary(withPolicy).summary).toBe(true)
+  expect(parseCleanupSummary(withPolicy).removed).toEqual([{ name: "same", rule: "duplicate-test" }])
+})
+
 test("parseCleanupSummary marks stderr without the cleanup summary", () => {
   expect(parseCleanupSummary("TEST QUALITY DETECTED\n<findings file=\"a.test.ts\"></findings>").summary).toBe(false)
 })

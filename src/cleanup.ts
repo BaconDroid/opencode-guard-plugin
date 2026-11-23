@@ -25,7 +25,9 @@ const CLEANUP_TIMEOUT_MS = 30_000
 
 // The binary appends this summary to stderr for every `--strip` run. Its
 // absence is how an older binary (unknown `--strip`) is detected.
-const SUMMARY_MARKER = "[test-checker] cleanup pass:"
+// The summary gained a ` (<policy>)` suffix when `--strip-policy` shipped, so the
+// marker stops before it.
+const SUMMARY_MARKER = "[test-checker] cleanup pass"
 
 // `--strip` first shipped in test-checker 0.4.0 (v0.3.x has no cleanup summary).
 const STRIP_CAPABLE_VERSION = [0, 4, 0]
