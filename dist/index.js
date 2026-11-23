@@ -4240,10 +4240,12 @@ var GUARD_AUDIT_COMMAND = {
 
 // src/cleanup.ts
 import { tool as tool3 } from "@opencode-ai/plugin";
+import { spawnSync } from "child_process";
 import { existsSync as existsSync5, readFileSync as readFileSync5 } from "fs";
 import { relative as relative4 } from "path";
 var CLEANUP_TIMEOUT_MS = 30000;
 var SUMMARY_MARKER = "[test-checker] cleanup pass:";
+var STRIP_CAPABLE_VERSION = [0, 4, 0];
 var REMOVED_LINE = /^\s+removed: (.+) \[([^\]]+)\]\s*$/;
 var KEPT_LINE = /^\s+kept awaiting approval: (.+) \[([^\]]+)\]\s*$/;
 var NOTE_LINE = /^\s+note: (.+)\s*$/;
@@ -4320,6 +4322,23 @@ async function resolveBinary(cliPath) {
 function display2(filePath, directory) {
   return relative4(directory, filePath) || filePath;
 }
+function readVersion(binaryPath) {
+  const result = spawnSync(binaryPath, ["--version"], { encoding: "utf8", timeout: 5000 });
+  if (result.error || typeof result.stdout !== "string")
+    return;
+  const match = /(\d+)\.(\d+)\.(\d+)/.exec(result.stdout);
+  return match ? match[0] : undefined;
+}
+function meetsVersion(version, floor) {
+  const parts = version.split(".").map(Number);
+  for (let index = 0;index < floor.length; index += 1) {
+    const have = parts[index] ?? 0;
+    const need = floor[index] ?? 0;
+    if (have !== need)
+      return have > need;
+  }
+  return true;
+}
 async function collectCleanup(options, deps = {}) {
   const directory = options.directory;
   const testPatterns = options.testPatterns ?? [];
@@ -4382,12 +4401,15 @@ async function collectCleanup(options, deps = {}) {
       file.note = parsed.note;
     files.push(file);
   }
+  const missingSummary = files.length > 0 && files.every((file) => !file.summary && !file.error);
+  const version = missingSummary ? readVersion(binaryPath) : undefined;
   return {
     directory,
     files,
     skipped,
     binaryAvailable: true,
-    unsupported: files.length > 0 && files.every((file) => !file.summary && !file.error),
+    unsupported: missingSummary,
+    version,
     generatedAt: new Date().toISOString()
   };
 }
@@ -4400,6 +4422,13 @@ function renderCleanup(report) {
   const removed = report.files.reduce((count, file) => count + file.removed.length, 0);
   const kept = report.files.reduce((count, file) => count + file.kept.length, 0);
   if (!report.binaryAvailable) {
+    if (report.unsupported && report.version !== undefined) {
+      const belowFloor = !meetsVersion(report.version, STRIP_CAPABLE_VERSION);
+      lines.push(belowFloor ? `test-checker ${report.version} predates \`--strip\`; install test-checker ${STRIP_CAPABLE_VERSION.join(".")} or newer. Nothing was rewritten.` : `test-checker ${report.version} did not report a cleanup pass; nothing was rewritten.`);
+      appendSkipped(lines, report.skipped);
+      return lines.join(`
+`);
+    }
     lines.push("No test-checker binary available; nothing was checked or rewritten.");
     appendSkipped(lines, report.skipped);
     return lines.join(`

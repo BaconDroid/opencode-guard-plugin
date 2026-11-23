@@ -25,6 +25,7 @@ export interface CleanupReport {
     skipped: string[];
     binaryAvailable: boolean;
     unsupported: boolean;
+    version?: string;
     generatedAt: string;
 }
 export type CleanupRun = {
