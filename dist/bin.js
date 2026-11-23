@@ -3092,7 +3092,7 @@ async function defaultRun(input, binaryPath, timeoutMs) {
   if (!existsSync5(binaryPath)) {
     return { kind: "did-not-run", reason: `binary not found at ${binaryPath}` };
   }
-  const outcome = await runProcess([binaryPath, "--strip", "--min-confidence", "low"], {
+  const outcome = await runProcess([binaryPath, "--strip", "--strip-policy", "balanced", "--min-confidence", "low"], {
     stdin: JSON.stringify(input),
     timeoutMs
   });

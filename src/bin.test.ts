@@ -121,7 +121,9 @@ test("guard cleanup forwards only test files to --strip and renders removed and 
     expect(result.stdout).toContain("taut")
     expect(result.stdout).toContain("tautological-assertion")
     expect(result.stdout).toContain(".test-checker.json")
-    expect(await Bun.file(argsPath).text()).toBe("--strip\n--min-confidence\nlow\n")
+    expect(await Bun.file(argsPath).text()).toBe(
+      "--strip\n--strip-policy\nbalanced\n--min-confidence\nlow\n",
+    )
     expect((await Bun.file(callsPath).text()).trim().split("\n")).toHaveLength(1)
 
     const payload = JSON.parse(await Bun.file(stdinPath).text())

@@ -413,7 +413,8 @@ output (they are hidden by default).
 the added lines of the changed files, and `both` runs both.
 
 `guard cleanup` walks the repository's test files, runs the test-checker
-`--strip` pass on each, and prints the removed and kept-awaiting-approval items.
+`--strip --strip-policy balanced` pass on each, and prints the removed and
+kept-awaiting-approval items.
 Harness/config files are selected by the shared gate and listed as skipped
 because `--strip` runs on test bodies. It exits 0 on success, including when
 nothing was approved or removed. A missing binary is reported and treated as a
