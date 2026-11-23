@@ -4043,7 +4043,7 @@ import { spawnSync } from "child_process";
 import { existsSync as existsSync5, readFileSync as readFileSync5 } from "fs";
 import { relative as relative4 } from "path";
 var CLEANUP_TIMEOUT_MS = 30000;
-var SUMMARY_MARKER = "[test-checker] cleanup pass:";
+var SUMMARY_MARKER = "[test-checker] cleanup pass";
 var STRIP_CAPABLE_VERSION = [0, 4, 0];
 var REMOVED_LINE = /^\s+removed: (.+) \[([^\]]+)\]\s*$/;
 var KEPT_LINE = /^\s+kept awaiting approval: (.+) \[([^\]]+)\]\s*$/;
