@@ -1,11 +1,12 @@
 import { type TestCheckerRunner } from "./analyzer";
-import type { GuardBaseConfig, Severity, TestEngine } from "./config";
+import type { GuardBaseConfig, Severity, StripPolicy, TestEngine } from "./config";
 import type { ToolGuard } from "../types";
 export interface ResolvedTestGuard extends GuardBaseConfig {
     testPatterns: string[];
     testCommand?: string | null;
     checks: Record<string, Severity>;
     engine?: TestEngine;
+    stripPolicy?: StripPolicy;
 }
 export type TestGuard = ToolGuard;
 export interface TestGuardDeps {

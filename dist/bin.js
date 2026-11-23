@@ -2510,6 +2510,14 @@ function asEngine(value) {
     return normalized;
   return;
 }
+function asStripPolicy(value) {
+  if (typeof value !== "string")
+    return;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "conservative" || normalized === "balanced" || normalized === "aggressive")
+    return normalized;
+  return;
+}
 function asKeywordAcquit(value) {
   if (typeof value !== "string")
     return;
@@ -2620,6 +2628,9 @@ function validateTestGuard(record, path, errors) {
   if (record.engine !== undefined && asEngine(record.engine) === undefined) {
     errors.push(`${path}.engine must be one of binary, regex`);
   }
+  if (record.strip_policy !== undefined && asStripPolicy(record.strip_policy) === undefined) {
+    errors.push(`${path}.strip_policy must be one of conservative, balanced, aggressive`);
+  }
   if (record.checks !== undefined) {
     if (!isRecord(record.checks))
       errors.push(`${path}.checks must be an object`);
@@ -2660,7 +2671,8 @@ function validateTestGuard(record, path, errors) {
     "tools",
     "engine",
     "mutation",
-    "parser"
+    "parser",
+    "strip_policy"
   ], path, errors);
 }
 function validateMutation(record, path, errors) {
@@ -3088,11 +3100,11 @@ function cleanupPayload(filePath, cwd, content) {
     tool_input: { file_path: filePath, content }
   };
 }
-async function defaultRun(input, binaryPath, timeoutMs) {
+async function defaultRun(input, binaryPath, timeoutMs, policy) {
   if (!existsSync5(binaryPath)) {
     return { kind: "did-not-run", reason: `binary not found at ${binaryPath}` };
   }
-  const outcome = await runProcess([binaryPath, "--strip", "--strip-policy", "balanced", "--min-confidence", "low"], {
+  const outcome = await runProcess([binaryPath, "--strip", "--strip-policy", policy, "--min-confidence", "low"], {
     stdin: JSON.stringify(input),
     timeoutMs
   });
@@ -3142,6 +3154,7 @@ async function collectCleanup(options, deps = {}) {
   const directory = options.directory;
   const testPatterns = options.testPatterns ?? [];
   const run = deps.run ?? defaultRun;
+  const policy = options.stripPolicy ?? "balanced";
   const skipped = [];
   const testFiles = [];
   for (const filePath of listRepositoryFiles(directory, options.paths)) {
@@ -3186,7 +3199,7 @@ async function collectCleanup(options, deps = {}) {
       kept: [],
       summary: false
     };
-    const outcome = await run(cleanupPayload(filePath, directory, content), binaryPath, options.timeoutMs ?? CLEANUP_TIMEOUT_MS);
+    const outcome = await run(cleanupPayload(filePath, directory, content), binaryPath, options.timeoutMs ?? CLEANUP_TIMEOUT_MS, policy);
     if (outcome.kind === "did-not-run") {
       file.error = outcome.reason;
       files.push(file);
@@ -3400,8 +3413,15 @@ async function auditCommand(parsed) {
 `);
   return 0;
 }
-async function cleanupCommand() {
-  const output = await runCleanup({ directory: process.cwd(), testPatterns: [] });
+async function cleanupCommand(parsed) {
+  const policy = parsed.flags["strip-policy"];
+  const stripPolicy = policy === undefined ? "balanced" : asStripPolicy(policy);
+  if (stripPolicy === undefined) {
+    process.stderr.write(`--strip-policy must be conservative, balanced or aggressive
+`);
+    return 2;
+  }
+  const output = await runCleanup({ directory: process.cwd(), testPatterns: [], stripPolicy });
   process.stdout.write(`${output}
 `);
   return 0;
@@ -3443,7 +3463,7 @@ function usage() {
     "  check [--diff] [--base <rev>] [--scope tests|comments|both] [--json] [--include-advisory]",
     "  validate-config [file]",
     "  audit [--scope comments|tests|both] [--paths a,b] [--json] [--include-advisory]",
-    "  cleanup",
+    "  cleanup [--strip-policy conservative|balanced|aggressive]",
     ""
   ].join(`
 `));
@@ -3463,7 +3483,7 @@ async function main(argv) {
     case "audit":
       return auditCommand(parsed);
     case "cleanup":
-      return cleanupCommand();
+      return cleanupCommand(parsed);
     default:
       usage();
       return command ? 2 : 0;

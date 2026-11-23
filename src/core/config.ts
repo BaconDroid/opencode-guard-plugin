@@ -27,6 +27,17 @@ export function asEngine(value: unknown): TestEngine | undefined {
 // leaves only its structural classes.
 export type KeywordAcquit = "proven-only" | "never"
 
+// Removal tier the cleanup pass takes on its own; mirrors
+// `test-checker --strip-policy`, whose default is `balanced`.
+export type StripPolicy = "conservative" | "balanced" | "aggressive"
+
+export function asStripPolicy(value: unknown): StripPolicy | undefined {
+  if (typeof value !== "string") return undefined
+  const normalized = value.trim().toLowerCase()
+  if (normalized === "conservative" || normalized === "balanced" || normalized === "aggressive") return normalized
+  return undefined
+}
+
 export function asKeywordAcquit(value: unknown): KeywordAcquit | undefined {
   if (typeof value !== "string") return undefined
   const normalized = value.trim().toLowerCase()
