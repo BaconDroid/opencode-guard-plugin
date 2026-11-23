@@ -2,7 +2,7 @@ import { tool } from "@opencode-ai/plugin";
 import { Plugin } from "@opencode/plugin";
 import type { ToolExecuteInput, ToolExecuteOutput } from "./types";
 /** Arguments the factory needs from the host: the project directory and, for the
- * opt-in judge, a client that can run one model prompt. */
+ * parser adapter, a client that can run one model prompt. */
 export interface PluginHooksInput {
     directory?: string;
     client?: unknown;

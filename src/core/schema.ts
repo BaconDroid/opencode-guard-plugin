@@ -55,11 +55,7 @@ function validateCommentChecker(record: Record<string, unknown>, path: string, e
   if (record.keyword_acquit !== undefined && asKeywordAcquit(record.keyword_acquit) === undefined) {
     errors.push(`${path}.keyword_acquit must be one of proven-only, never`)
   }
-  if (record.judge !== undefined) {
-    if (!isRecord(record.judge)) errors.push(`${path}.judge must be an object`)
-    else validateJudge(record.judge, `${path}.judge`, errors)
-  }
-  rejectUnknown(record, ["enabled", "custom_prompt", "append_prompt", "max_warnings_per_file", "dedup_window_ms", "timeout_ms", "tools", "paths", "keyword_acquit", "judge"], path, errors)
+  rejectUnknown(record, ["enabled", "custom_prompt", "append_prompt", "max_warnings_per_file", "dedup_window_ms", "timeout_ms", "tools", "paths", "keyword_acquit"], path, errors)
 }
 
 function validateTestGuard(record: Record<string, unknown>, path: string, errors: string[]): void {
@@ -100,10 +96,6 @@ function validateTestGuard(record: Record<string, unknown>, path: string, errors
     if (!isRecord(record.mutation)) errors.push(`${path}.mutation must be an object`)
     else validateMutation(record.mutation, `${path}.mutation`, errors)
   }
-  if (record.judge !== undefined) {
-    if (!isRecord(record.judge)) errors.push(`${path}.judge must be an object`)
-    else validateJudge(record.judge, `${path}.judge`, errors)
-  }
   if (record.parser !== undefined) {
     if (!isRecord(record.parser)) errors.push(`${path}.parser must be an object`)
     else validateParser(record.parser, `${path}.parser`, errors)
@@ -122,7 +114,6 @@ function validateTestGuard(record: Record<string, unknown>, path: string, errors
       "tools",
       "engine",
       "mutation",
-      "judge",
       "parser",
     ],
     path,

@@ -759,9 +759,7 @@ test("registers the guard tools", async () => {
   const hooks = await newSession()
   expect(hooks.tool!.guard_audit).toBeDefined()
   expect(hooks.tool!.guard_cleanup).toBeDefined()
-  expect(hooks.tool!.guard_judge).toBeDefined()
   expect(hooks.tool!.guard_parse).toBeDefined()
-  expect(hooks.tool!.guard_comment_judge).toBeDefined()
 })
 
 test("default export is a v2 plugin definition", () => {
@@ -775,17 +773,15 @@ test("registers the guard tools on the v2 tool domain", async () => {
   expect(host.tools.map(tool => tool.name)).toEqual([
     "guard_audit",
     "guard_cleanup",
-    "guard_judge",
     "guard_parse",
-    "guard_comment_judge",
   ])
   for (const tool of host.tools) {
     expect(tool.input).toMatchObject({ type: "object" })
     expect(typeof tool.execute).toBe("function")
   }
 
-  const judge = host.tools.find(tool => tool.name === "guard_judge")!
-  await expect(judge.execute({})).resolves.toMatchObject({ content: expect.stringContaining("disabled") })
+  const parser = host.tools.find(tool => tool.name === "guard_parse")!
+  await expect(parser.execute({})).resolves.toMatchObject({ content: expect.stringContaining("disabled") })
   host.cleanup?.()
 })
 

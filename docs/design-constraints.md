@@ -12,8 +12,10 @@ product, not just the implementation.
 - Fail-open everywhere: an internal guard error is swallowed and logged, so a
   guard defect cannot prevent the agent's action. This is a quality guard, not a
   security guard.
-- The LLM judges, the mutation runner and the external parser adapter are opt-in
-  analyzers: advisory, per-session cooldown, disabled by default, never a gate.
+- The mutation runner and the external parser adapter are opt-in analyzers:
+  advisory, per-session cooldown, disabled by default, never a gate. The LLM
+  judges were removed: the guard is deterministic, and the current session's
+  own model already reads the same hook message.
 - No aggregate "test smell count" gate and no coverage gate: smell detectors are
   low precision, and coverage does not correlate with test effectiveness. No
   oracle/reference-based category, which needs a reference implementation to
@@ -70,10 +72,10 @@ product, not just the implementation.
 - A mechanism one guard already uses may serve the other unless reuse changes
   observable output or breaks a constraint above.
 - Shared: config resolution, diff and pre-image reads, budget, bypass markers,
-  runner, glob, idle-advisory plumbing, judge plumbing, schema and
+  runner, glob, idle-advisory plumbing, schema and
   `validate-config`, the `Finding` model, and the output append.
 - Never shared: comment feedback through the `Finding` model or marker, comment
-  detection through regex, a bundled parser, the LLM as a gate, Java support.
+  detection through regex, a bundled parser, a model call of any kind, Java support.
 
 ## Engineering
 
