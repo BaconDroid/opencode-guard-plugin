@@ -8,6 +8,7 @@
 
 import { readFileSync } from "node:fs"
 import { runCommentDiffCheck, runDiffCheck } from "./core/ci"
+import { asStripPolicy } from "./core/config"
 import { validateTupleOptions } from "./core/schema"
 import { detectTestCommand } from "./core/test-command"
 import { runAudit } from "./audit"
@@ -90,8 +91,14 @@ async function auditCommand(parsed: ParsedArgs): Promise<number> {
   return 0
 }
 
-async function cleanupCommand(): Promise<number> {
-  const output = await runCleanup({ directory: process.cwd(), testPatterns: [] })
+async function cleanupCommand(parsed: ParsedArgs): Promise<number> {
+  const policy = parsed.flags["strip-policy"]
+  const stripPolicy = policy === undefined ? "balanced" : asStripPolicy(policy)
+  if (stripPolicy === undefined) {
+    process.stderr.write("--strip-policy must be conservative, balanced or aggressive\n")
+    return 2
+  }
+  const output = await runCleanup({ directory: process.cwd(), testPatterns: [], stripPolicy })
   process.stdout.write(`${output}\n`)
   return 0
 }
@@ -133,7 +140,7 @@ function usage(): void {
       "  check [--diff] [--base <rev>] [--scope tests|comments|both] [--json] [--include-advisory]",
       "  validate-config [file]",
       "  audit [--scope comments|tests|both] [--paths a,b] [--json] [--include-advisory]",
-      "  cleanup",
+      "  cleanup [--strip-policy conservative|balanced|aggressive]",
       "",
     ].join("\n"),
   )
@@ -155,7 +162,7 @@ async function main(argv: string[]): Promise<number> {
     case "audit":
       return auditCommand(parsed)
     case "cleanup":
-      return cleanupCommand()
+      return cleanupCommand(parsed)
     default:
       usage()
       return command ? 2 : 0

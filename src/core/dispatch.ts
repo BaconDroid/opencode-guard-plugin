@@ -5,7 +5,7 @@ import { APPLY_PATCH_TOOL_NAME, DEFAULT_DEDUP_WINDOW_MS } from "../constants"
 import { AnalyzerRegistry, type TestCheckerRunner } from "./analyzer"
 import { GuardBudget } from "./budget"
 import type { Bypass } from "./bypass"
-import type { GuardBaseConfig, Severity, TestEngine } from "./config"
+import type { GuardBaseConfig, Severity, StripPolicy, TestEngine } from "./config"
 import { createDebugLog } from "./debug"
 import { extractPatchChanges, extractToolChange, firstString, readFileIfExists, type ExtractedChange } from "./diff"
 import { appendFeedback, didNotRunMessage, fallbackMessage, type Finding } from "./feedback"
@@ -31,6 +31,8 @@ export interface ResolvedTestGuard extends GuardBaseConfig {
   // Detection engine: the downloaded `test-checker` binary (default) with the
   // in-process regex rules as the fail-open fallback.
   engine?: TestEngine
+  // `guard cleanup` removal tier; absent means `balanced`.
+  stripPolicy?: StripPolicy
 }
 
 const DEFAULT_TEST_GUARD: ResolvedTestGuard = {
@@ -39,6 +41,7 @@ const DEFAULT_TEST_GUARD: ResolvedTestGuard = {
   checks: {},
   maxWarningsPerFile: 0,
   engine: "binary",
+  stripPolicy: "balanced",
 }
 
 export type TestGuard = ToolGuard

@@ -723,6 +723,14 @@ function asEngine(value) {
     return normalized;
   return;
 }
+function asStripPolicy(value) {
+  if (typeof value !== "string")
+    return;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "conservative" || normalized === "balanced" || normalized === "aggressive")
+    return normalized;
+  return;
+}
 function asKeywordAcquit(value) {
   if (typeof value !== "string")
     return;
@@ -2971,7 +2979,8 @@ var DEFAULT_TEST_GUARD = {
   testPatterns: [],
   checks: {},
   maxWarningsPerFile: 0,
-  engine: "binary"
+  engine: "binary",
+  stripPolicy: "balanced"
 };
 function createTestGuard(getResolved, deps = {}) {
   const budget = new GuardBudget;
@@ -4079,11 +4088,11 @@ function cleanupPayload(filePath, cwd, content) {
     tool_input: { file_path: filePath, content }
   };
 }
-async function defaultRun2(input, binaryPath, timeoutMs) {
+async function defaultRun2(input, binaryPath, timeoutMs, policy) {
   if (!existsSync5(binaryPath)) {
     return { kind: "did-not-run", reason: `binary not found at ${binaryPath}` };
   }
-  const outcome = await runProcess([binaryPath, "--strip", "--strip-policy", "balanced", "--min-confidence", "low"], {
+  const outcome = await runProcess([binaryPath, "--strip", "--strip-policy", policy, "--min-confidence", "low"], {
     stdin: JSON.stringify(input),
     timeoutMs
   });
@@ -4133,6 +4142,7 @@ async function collectCleanup(options, deps = {}) {
   const directory = options.directory;
   const testPatterns = options.testPatterns ?? [];
   const run = deps.run ?? defaultRun2;
+  const policy = options.stripPolicy ?? "balanced";
   const skipped = [];
   const testFiles = [];
   for (const filePath of listRepositoryFiles(directory, options.paths)) {
@@ -4177,7 +4187,7 @@ async function collectCleanup(options, deps = {}) {
       kept: [],
       summary: false
     };
-    const outcome = await run(cleanupPayload(filePath, directory, content), binaryPath, options.timeoutMs ?? CLEANUP_TIMEOUT_MS);
+    const outcome = await run(cleanupPayload(filePath, directory, content), binaryPath, options.timeoutMs ?? CLEANUP_TIMEOUT_MS, policy);
     if (outcome.kind === "did-not-run") {
       file.error = outcome.reason;
       files.push(file);
@@ -4325,7 +4335,11 @@ function createGuardCleanupTool(options) {
             return;
           }
         })();
-        return await runCleanup({ directory: options.directory, testPatterns: config?.testPatterns ?? [] }, options.deps);
+        return await runCleanup({
+          directory: options.directory,
+          testPatterns: config?.testPatterns ?? [],
+          stripPolicy: config?.stripPolicy
+        }, options.deps);
       } catch (err) {
         return `cleanup failed: ${err instanceof Error ? err.message : String(err)}`;
       }
@@ -4485,7 +4499,8 @@ var resolvedTestGuard = {
   checks: { ...DEFAULT_TEST_CHECKS },
   maxWarningsPerFile: 0,
   triggerTools: new Set(DEFAULT_TRIGGER_TOOLS),
-  engine: "binary"
+  engine: "binary",
+  stripPolicy: "balanced"
 };
 var resolvedMutation = { enabled: false };
 var resolvedParser = { enabled: false };
@@ -4497,6 +4512,7 @@ function resolveTestGuardConfiguration(config) {
   resolvedTestGuard.testPatterns = resolveOption(asPatterns, "TEST_GUARD_TEST_PATTERNS", "test_patterns", inputs) ?? [...DEFAULT_TEST_PATTERNS];
   resolvedTestGuard.testCommand = resolveOption(asString, "TEST_GUARD_TEST_COMMAND", "test_command", inputs) ?? detectTestCommand(projectDirectory);
   resolvedTestGuard.engine = resolveOption(asEngine, "TEST_GUARD_ENGINE", "engine", inputs) ?? "binary";
+  resolvedTestGuard.stripPolicy = resolveOption(asStripPolicy, "TEST_GUARD_STRIP_POLICY", "strip_policy", inputs) ?? "balanced";
   resolveCommandAdapter(resolvedMutation, "TEST_GUARD_MUTATION", subConfigInputs(options, fromConfig, "mutation"));
   resolveCommandAdapter(resolvedParser, "TEST_GUARD_PARSER", subConfigInputs(options, fromConfig, "parser"));
   resolvedTestGuard.checks = resolveRuleConfig(DEFAULT_TEST_CHECKS, {

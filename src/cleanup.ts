@@ -14,6 +14,7 @@ import { relative } from "node:path"
 import { isSecretFile, listRepositoryFiles } from "./audit"
 import { getTestCheckerPath } from "./cli"
 import { COMMENT_CHECKER_EVENT } from "./constants"
+import type { StripPolicy } from "./core/config"
 import { detectLanguage, isSupportedLanguage } from "./core/diff"
 import type { ResolvedTestGuard } from "./core/dispatch"
 import { runProcess } from "./core/runner"
@@ -72,7 +73,7 @@ export type CleanupRun =
   | { kind: "did-not-run"; reason: string }
 
 export interface CleanupDeps {
-  run?: (input: HookInput, binaryPath: string, timeoutMs: number) => Promise<CleanupRun>
+  run?: (input: HookInput, binaryPath: string, timeoutMs: number, policy: StripPolicy) => Promise<CleanupRun>
 }
 
 export interface CleanupOptions {
@@ -83,6 +84,8 @@ export interface CleanupOptions {
   paths?: string[]
   cliPath?: string
   timeoutMs?: number
+  // `balanced` unless a configured test guard asks for another tier.
+  stripPolicy?: StripPolicy
 }
 
 export function parseCleanupSummary(stderr: string): CleanupStderrSummary {
@@ -129,13 +132,18 @@ function cleanupPayload(filePath: string, cwd: string, content: string): HookInp
   }
 }
 
-async function defaultRun(input: HookInput, binaryPath: string, timeoutMs: number): Promise<CleanupRun> {
+async function defaultRun(
+  input: HookInput,
+  binaryPath: string,
+  timeoutMs: number,
+  policy: StripPolicy,
+): Promise<CleanupRun> {
   if (!existsSync(binaryPath)) {
     return { kind: "did-not-run", reason: `binary not found at ${binaryPath}` }
   }
 
   const outcome = await runProcess(
-    [binaryPath, "--strip", "--strip-policy", "balanced", "--min-confidence", "low"],
+    [binaryPath, "--strip", "--strip-policy", policy, "--min-confidence", "low"],
     {
       stdin: JSON.stringify(input),
       timeoutMs,
@@ -189,6 +197,7 @@ export async function collectCleanup(options: CleanupOptions, deps: CleanupDeps 
   const directory = options.directory
   const testPatterns = options.testPatterns ?? []
   const run = deps.run ?? defaultRun
+  const policy = options.stripPolicy ?? "balanced"
 
   const skipped: string[] = []
   const testFiles: string[] = []
@@ -239,6 +248,7 @@ export async function collectCleanup(options: CleanupOptions, deps: CleanupDeps 
       cleanupPayload(filePath, directory, content),
       binaryPath,
       options.timeoutMs ?? CLEANUP_TIMEOUT_MS,
+      policy,
     )
     if (outcome.kind === "did-not-run") {
       file.error = outcome.reason
@@ -416,7 +426,11 @@ export function createGuardCleanupTool(options: {
           }
         })()
         return await runCleanup(
-          { directory: options.directory, testPatterns: config?.testPatterns ?? [] },
+          {
+            directory: options.directory,
+            testPatterns: config?.testPatterns ?? [],
+            stripPolicy: config?.stripPolicy,
+          },
           options.deps,
         )
       } catch (err) {

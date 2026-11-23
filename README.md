@@ -140,6 +140,7 @@ tests. It reuses the same tuple, under a sibling `test_guard` key:
       "test_guard": {
         "enabled": true,
         "engine": "binary",
+        "strip_policy": "balanced",
         "checks": { "protected-paths": "warn", "skip-focus-added": "warn" },
         "mutation": { "enabled": false, "command": "npx stryker run --reporters json", "timeout_ms": 120000 },
         "parser": { "enabled": false, "command": "my-ast-check --json", "timeout_ms": 30000 }
@@ -313,7 +314,7 @@ file-level `// test-guard-disable-file`.
 advisory notes still surface on the next tool call regardless of this filter.
 
 Env vars mirror the comment guard: `TEST_GUARD_ENABLED`,
-`TEST_GUARD_ENGINE`, `TEST_GUARD_TEST_PATTERNS`, `TEST_GUARD_TOOLS`,
+`TEST_GUARD_ENGINE`, `TEST_GUARD_STRIP_POLICY`, `TEST_GUARD_TEST_PATTERNS`, `TEST_GUARD_TOOLS`,
 `TEST_GUARD_MAX_WARNINGS_PER_FILE`, `TEST_GUARD_DEDUP_WINDOW_MS`,
 `TEST_GUARD_CUSTOM_PROMPT`,
 `TEST_GUARD_APPEND_PROMPT`, `TEST_GUARD_MUTATION_ENABLED`,
@@ -413,8 +414,13 @@ output (they are hidden by default).
 the added lines of the changed files, and `both` runs both.
 
 `guard cleanup` walks the repository's test files, runs the test-checker
-`--strip --strip-policy balanced` pass on each, and prints the removed and
-kept-awaiting-approval items.
+`--strip --strip-policy <level>` pass on each, and prints the removed and
+kept-awaiting-approval items. The level is `test_guard.strip_policy`, `balanced`
+unless the tuple or `TEST_GUARD_STRIP_POLICY` sets it: `conservative` takes only
+the proven tier, `balanced` adds the audited heuristics, and `aggressive` also
+takes the low-confidence telemetry such as `echo-test` and
+`mirror-implementation-test`. `guard cleanup --strip-policy <level>` overrides it
+for a single run.
 Harness/config files are selected by the shared gate and listed as skipped
 because `--strip` runs on test bodies. It exits 0 on success, including when
 nothing was approved or removed. A missing binary is reported and treated as a

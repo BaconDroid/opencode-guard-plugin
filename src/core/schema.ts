@@ -1,7 +1,7 @@
 // Zero-dependency validator for the plugin tuple options, used by
 // `guard validate-config`.
 
-import { asCount, asEngine, asKeywordAcquit, asLevel, asPatterns, asString, asTools } from "./config"
+import { asCount, asEngine, asKeywordAcquit, asLevel, asPatterns, asString, asStripPolicy, asTools } from "./config"
 
 const SEVERITY = ["off", "warn"]
 
@@ -78,6 +78,9 @@ function validateTestGuard(record: Record<string, unknown>, path: string, errors
   if (record.engine !== undefined && asEngine(record.engine) === undefined) {
     errors.push(`${path}.engine must be one of binary, regex`)
   }
+  if (record.strip_policy !== undefined && asStripPolicy(record.strip_policy) === undefined) {
+    errors.push(`${path}.strip_policy must be one of conservative, balanced, aggressive`)
+  }
   if (record.checks !== undefined) {
     if (!isRecord(record.checks)) errors.push(`${path}.checks must be an object`)
     else {
@@ -115,6 +118,7 @@ function validateTestGuard(record: Record<string, unknown>, path: string, errors
       "engine",
       "mutation",
       "parser",
+      "strip_policy",
     ],
     path,
     errors,

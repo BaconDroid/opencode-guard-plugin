@@ -140,6 +140,35 @@ test("guard cleanup forwards only test files to --strip and renders removed and 
   }
 })
 
+test("guard cleanup forwards --strip-policy to the binary", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "guard-bin-cleanup-policy-"))
+  try {
+    writeFileSync(join(dir, "a.test.ts"), "test('a', () => {\n  expect(1).toBe(1)\n})\n")
+    const argsPath = join(dir, "args.txt")
+    const binary = writeCleanupStub(
+      dir,
+      [
+        "#!/bin/sh",
+        `printf '%s\\n' "$@" > '${argsPath}'`,
+        "cat > /dev/null",
+        "printf '%s\\n' '[test-checker] cleanup pass: 0 removed, 0 kept awaiting approval.' >&2",
+        "exit 0",
+        "",
+      ].join("\n"),
+    )
+
+    const ok = runCli(["guard", "cleanup", "--strip-policy", "aggressive"], dir, { TC_BINARY: binary })
+    expect(ok.exitCode).toBe(0)
+    expect(await Bun.file(argsPath).text()).toContain("--strip-policy\naggressive")
+
+    const bad = runCli(["guard", "cleanup", "--strip-policy", "total"], dir, { TC_BINARY: binary })
+    expect(bad.exitCode).toBe(2)
+    expect(bad.stderr).toContain("--strip-policy must be")
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
 test("guard cleanup reports a pre-strip binary as nothing to do and exits 0", async () => {
   const dir = mkdtempSync(join(tmpdir(), "guard-bin-cleanup-old-"))
   try {

@@ -70,6 +70,13 @@ test("accepts the test_guard.engine values and rejects an unknown one", () => {
   expect(validateTupleOptions({ test_guard: { engine: 3 } }).valid).toBe(false)
 })
 
+test("accepts the strip_policy tiers and rejects an unknown one", () => {
+  for (const policy of ["conservative", "balanced", "aggressive", "BALANCED"]) {
+    expect(validateTupleOptions({ test_guard: { strip_policy: policy } }).valid).toBe(true)
+  }
+  expect(validateTupleOptions({ test_guard: { strip_policy: "total" } }).valid).toBe(false)
+})
+
 test("accepts a valid mutation block", () => {
   expect(
     validateTupleOptions({ test_guard: { mutation: { enabled: true, command: "npx stryker run", timeout_ms: 60000 } } }).valid,

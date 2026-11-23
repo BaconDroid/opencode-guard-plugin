@@ -11,6 +11,7 @@ import {
   asPatterns,
   asRecord,
   asString,
+  asStripPolicy,
   asTools,
   optionContainer,
   resolveOption,
@@ -253,6 +254,7 @@ const resolvedTestGuard: ResolvedTestGuard = {
   maxWarningsPerFile: 0,
   triggerTools: new Set(DEFAULT_TRIGGER_TOOLS),
   engine: "binary",
+  stripPolicy: "balanced",
 }
 
 const resolvedMutation: MutationConfig = { enabled: false }
@@ -273,6 +275,8 @@ function resolveTestGuardConfiguration(config?: unknown): void {
     resolveOption(asString, "TEST_GUARD_TEST_COMMAND", "test_command", inputs) ?? detectTestCommand(projectDirectory)
 
   resolvedTestGuard.engine = resolveOption(asEngine, "TEST_GUARD_ENGINE", "engine", inputs) ?? "binary"
+  resolvedTestGuard.stripPolicy =
+    resolveOption(asStripPolicy, "TEST_GUARD_STRIP_POLICY", "strip_policy", inputs) ?? "balanced"
 
   resolveCommandAdapter(resolvedMutation, "TEST_GUARD_MUTATION", subConfigInputs(options, fromConfig, "mutation"))
   resolveCommandAdapter(resolvedParser, "TEST_GUARD_PARSER", subConfigInputs(options, fromConfig, "parser"))

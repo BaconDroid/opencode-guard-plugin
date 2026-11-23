@@ -13,7 +13,7 @@ import {
   type AuditReport,
 } from "./audit"
 import type { ResolvedTestGuard } from "./core/dispatch"
-import { collectCleanup, parseCleanupSummary, renderCleanup } from "./cleanup"
+import { collectCleanup, createGuardCleanupTool, parseCleanupSummary, renderCleanup } from "./cleanup"
 
 const dir = mkdtempSync(join(tmpdir(), "guard-audit-"))
 writeFileSync(join(dir, "a.test.ts"), 'test("empty", () => {\n})\n\ntest("taut", () => {\n  expect(true).toBe(true)\n})\n')
@@ -210,6 +210,55 @@ test("cleanup selects Ruby and Java tests and skips harness files", async () => 
   expect(calls.some(path => path.endsWith("conftest.py"))).toBe(false)
   expect(calls.some(path => path.endsWith("app.py"))).toBe(false)
   expect(report.skipped.some(entry => entry.includes("conftest.py"))).toBe(true)
+})
+
+test("cleanup forwards the configured strip policy and defaults to balanced", async () => {
+  const policies: string[] = []
+  const deps = {
+    run: async (_input: unknown, _binary: string, _timeout: number, policy: string) => {
+      policies.push(policy)
+      return { kind: "output" as const, exitCode: 2, stderr: "[test-checker] cleanup pass: 0 removed, 0 kept awaiting approval." }
+    },
+  }
+
+  await collectCleanup({ directory: dir, paths: [dir], testPatterns: ["**/*.test.ts"], cliPath: "/fake/test-checker" }, deps)
+  await collectCleanup(
+    { directory: dir, paths: [dir], testPatterns: ["**/*.test.ts"], cliPath: "/fake/test-checker", stripPolicy: "aggressive" },
+    deps,
+  )
+
+  expect(policies).toEqual(["balanced", "aggressive"])
+})
+
+test("the cleanup tool passes the resolved strip policy to the binary run", async () => {
+  const policies: string[] = []
+  const previousBinary = process.env.TC_BINARY
+  process.env.TC_BINARY = "/fake/test-checker"
+  const guardTool = createGuardCleanupTool({
+    directory: dir,
+    getConfig: () => ({
+      enabled: true,
+      testPatterns: ["**/*.test.ts"],
+      checks: {},
+      maxWarningsPerFile: 0,
+      stripPolicy: "aggressive",
+    }),
+    deps: {
+      run: async (_input, _binary, _timeout, policy) => {
+        policies.push(policy)
+        return { kind: "output", exitCode: 2, stderr: "[test-checker] cleanup pass: 0 removed, 0 kept awaiting approval." }
+      },
+    },
+  })
+
+  try {
+    await guardTool.execute({}, {} as never)
+  } finally {
+    if (previousBinary === undefined) delete process.env.TC_BINARY
+    else process.env.TC_BINARY = previousBinary
+  }
+
+  expect(policies).toEqual(["aggressive"])
 })
 
 test("cleanup renders removed and kept items with the approval pointer", async () => {

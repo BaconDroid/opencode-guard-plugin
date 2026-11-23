@@ -1,3 +1,4 @@
+import type { StripPolicy } from "./core/config";
 import type { ResolvedTestGuard } from "./core/dispatch";
 import type { HookInput } from "./types";
 export interface CleanupItem {
@@ -37,7 +38,7 @@ export type CleanupRun = {
     reason: string;
 };
 export interface CleanupDeps {
-    run?: (input: HookInput, binaryPath: string, timeoutMs: number) => Promise<CleanupRun>;
+    run?: (input: HookInput, binaryPath: string, timeoutMs: number, policy: StripPolicy) => Promise<CleanupRun>;
 }
 export interface CleanupOptions {
     directory: string;
@@ -45,6 +46,7 @@ export interface CleanupOptions {
     paths?: string[];
     cliPath?: string;
     timeoutMs?: number;
+    stripPolicy?: StripPolicy;
 }
 export declare function parseCleanupSummary(stderr: string): CleanupStderrSummary;
 export declare function collectCleanup(options: CleanupOptions, deps?: CleanupDeps): Promise<CleanupReport>;
