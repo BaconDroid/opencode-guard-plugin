@@ -23,7 +23,6 @@ import { createTestGuard, type ResolvedTestGuard } from "./core/dispatch"
 import { AdvisoryQueue, appendAdvisories } from "./core/advisory-queue"
 import { AnalyzerRegistry } from "./core/analyzer"
 import { createIdleAnalyzer } from "./core/idle-advisory"
-import { createGuardJudgeTool, createJudge, createModelJudgeRunner, resolveJudgeModel, type JudgeConfig, createCommentJudge, createGuardCommentJudgeTool } from "./core/judge"
 import { createGuardParseTool, createParserAdapter, type ParserAdapterConfig } from "./core/parser-adapter"
 import { createMutationAdapter, type MutationConfig } from "./core/mutation"
 import { createCommentGuard, type ResolvedCommentConfig } from "./rules/comments"
@@ -45,7 +44,7 @@ const DEFAULT_TEST_CHECKS = buildRuleChecks(false)
 // V2 host event shapes; these helpers keep that translation in one spot.
 
 /** Arguments the factory needs from the host: the project directory and, for the
- * opt-in judge, a client that can run one model prompt. */
+ * parser adapter, a client that can run one model prompt. */
 export interface PluginHooksInput {
   directory?: string
   client?: unknown
@@ -196,7 +195,7 @@ function subConfigInputs(
   return { options: asRecord(options?.[key]), config: asRecord(config?.[key]) }
 }
 
-// `enabled` and `timeout_ms`, shared by the judge and the command adapters.
+// `enabled` and `timeout_ms`, shared by the command adapters.
 function resolveAdapterBase(
   target: { enabled: boolean; timeoutMs?: number },
   envPrefix: string,
@@ -204,11 +203,6 @@ function resolveAdapterBase(
 ): void {
   target.enabled = resolveOption(asOptionalBoolean, `${envPrefix}_ENABLED`, "enabled", inputs) ?? false
   target.timeoutMs = resolveOption(value => asCount(value, 1), `${envPrefix}_TIMEOUT_MS`, "timeout_ms", inputs)
-}
-
-function resolveJudge(target: JudgeConfig, envPrefix: string, inputs: ResolveInputs): void {
-  resolveAdapterBase(target, envPrefix, inputs)
-  target.model = resolveJudgeModel(resolveOption(asString, `${envPrefix}_MODEL`, "model", inputs))
 }
 
 function resolveCommandAdapter(target: CommandAdapterConfig, envPrefix: string, inputs: ResolveInputs): void {
@@ -249,7 +243,6 @@ function resolveConfiguration(config?: unknown): void {
   resolvedCommentConfig.keywordAcquit =
     resolveOption(asKeywordAcquit, "COMMENT_CHECKER_KEYWORD_ACQUIT", "keyword_acquit", inputs) ?? "proven-only"
 
-  resolveJudge(resolvedCommentJudge, "COMMENT_CHECKER_JUDGE", subConfigInputs(options, fromConfig, "judge"))
 }
 
 const resolvedTestGuard: ResolvedTestGuard = {
@@ -264,8 +257,6 @@ const resolvedTestGuard: ResolvedTestGuard = {
 
 const resolvedMutation: MutationConfig = { enabled: false }
 
-const resolvedJudge: JudgeConfig = { enabled: false }
-const resolvedCommentJudge: JudgeConfig = { enabled: false }
 const resolvedParser: ParserAdapterConfig = { enabled: false }
 
 function resolveTestGuardConfiguration(config?: unknown): void {
@@ -284,7 +275,6 @@ function resolveTestGuardConfiguration(config?: unknown): void {
   resolvedTestGuard.engine = resolveOption(asEngine, "TEST_GUARD_ENGINE", "engine", inputs) ?? "binary"
 
   resolveCommandAdapter(resolvedMutation, "TEST_GUARD_MUTATION", subConfigInputs(options, fromConfig, "mutation"))
-  resolveJudge(resolvedJudge, "TEST_GUARD_JUDGE", subConfigInputs(options, fromConfig, "judge"))
   resolveCommandAdapter(resolvedParser, "TEST_GUARD_PARSER", subConfigInputs(options, fromConfig, "parser"))
 
   resolvedTestGuard.checks = resolveRuleConfig(DEFAULT_TEST_CHECKS, {
@@ -309,19 +299,6 @@ export async function createHooks(input: PluginHooksInput, options?: unknown): P
   const testGuard = createTestGuard(() => resolvedTestGuard)
   const auditTool = createGuardAuditTool({ directory: projectDirectory, getConfig: () => resolvedTestGuard })
   const cleanupTool = createGuardCleanupTool({ directory: projectDirectory, getConfig: () => resolvedTestGuard })
-  const judge = createJudge({
-    directory: projectDirectory,
-    getConfig: () => resolvedJudge,
-    getTestPatterns: () => resolvedTestGuard.testPatterns,
-    runner: createModelJudgeRunner(input.client, projectDirectory),
-  })
-  const judgeTool = createGuardJudgeTool(judge)
-  const commentJudge = createCommentJudge({
-    directory: projectDirectory,
-    getConfig: () => resolvedCommentJudge,
-    runner: createModelJudgeRunner(input.client, projectDirectory),
-  })
-  const commentJudgeTool = createGuardCommentJudgeTool(commentJudge)
   const parser = createParserAdapter({
     directory: projectDirectory,
     getConfig: () => resolvedParser,
@@ -332,18 +309,14 @@ export async function createHooks(input: PluginHooksInput, options?: unknown): P
 
   const analyzers = new AnalyzerRegistry()
   analyzers.register(createIdleAnalyzer("mutation", mutation))
-  analyzers.register(createIdleAnalyzer("test-judge", judge))
   analyzers.register(createIdleAnalyzer("parser", parser))
-  analyzers.register(createIdleAnalyzer("comment-judge", commentJudge))
   const advisories = new AdvisoryQueue()
 
   return {
     tool: {
       guard_audit: auditTool,
       guard_cleanup: cleanupTool,
-      guard_judge: judgeTool,
       guard_parse: parseTool,
-      guard_comment_judge: commentJudgeTool,
     },
     event: async ({ event }) => {
       if (event.type !== "session.idle") return
@@ -370,13 +343,11 @@ export async function createHooks(input: PluginHooksInput, options?: unknown): P
 export const CommentCheckerPlugin = Plugin.define({
   id: "opencode-guard-plugin",
   async setup(ctx) {
-    // V1 handed the judge runner the SDK client. V2 exposes a stateless,
-    // tool-free generation, which is exactly what the judge asked for (tools
-    // disabled, explicit model), so no throwaway session is created: `create`
-    // only mints the token the runner threads through create -> prompt -> delete.
+    // V1 handed this client to the (since removed) judge runner; the parser adapter still
+    // threads one generation through it, and `create` only mints the token.
     const client = {
       session: {
-        create: async () => ({ data: { id: "opencode-guard-plugin-judge" } }),
+        create: async () => ({ data: { id: "opencode-guard-plugin-parser" } }),
         prompt: async (request: { body?: Record<string, any> }) => {
           const body = request?.body ?? {}
           const system = typeof body.system === "string" ? body.system : ""

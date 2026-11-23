@@ -3300,216 +3300,6 @@ function parseJsonSlice(raw, open, close) {
   return slice === undefined ? undefined : tryParseJson(slice);
 }
 
-// src/core/judge.ts
-var DEFAULT_JUDGE_MODEL = "opencode/big-pickle";
-function resolveJudgeModel(configured) {
-  if (configured === "host")
-    return;
-  return configured ?? DEFAULT_JUDGE_MODEL;
-}
-var JUDGE_SYSTEM = "You are a read-only test-quality reviewer. Do not call any tool. Reply with JSON only.";
-function buildJudgePrompt(changes) {
-  const sections = [];
-  for (const change of changes) {
-    if (change.addedLines.length === 0 && change.removedLines.length === 0)
-      continue;
-    const removed = change.removedLines.map((line) => `- ${line}`).join(`
-`);
-    const added = change.addedLines.map((line) => `+ ${line}`).join(`
-`);
-    sections.push(`--- ${change.filePath}
-${removed}
-${added}`);
-  }
-  if (sections.length === 0)
-    return "";
-  return [
-    "Review the following test changes and decide whether any of them weakens the tests",
-    "(removed assertions, loosened matchers, skipped/focused tests, tautological assertions,",
-    "swallowed errors, or tests that no longer validate behavior).",
-    "Reply with ONLY a JSON array. Each item:",
-    '{"file": "<path>", "line": <number>, "reason": "<short>", "confidence": "high|medium|low"}.',
-    "If nothing weakens the tests, reply with [].",
-    "",
-    sections.join(`
-
-`)
-  ].join(`
-`);
-}
-function parseJudgeResponse(raw) {
-  const parsed = parseJsonSlice(raw, "[", "]");
-  if (!Array.isArray(parsed))
-    return [];
-  return parseAdvisoryFindings(parsed, "reason").map((finding) => ({
-    file: finding.file,
-    line: finding.line,
-    reason: finding.text,
-    confidence: finding.confidence
-  }));
-}
-function judgeFindingLines(findings) {
-  return findings.map((finding) => `- ${finding.file}:${finding.line} ${finding.reason} (${finding.confidence})`).join(`
-`);
-}
-function formatJudgeFindings(findings) {
-  return `LLM judge (advisory, opt-in):
-${judgeFindingLines(findings)}`;
-}
-function withTimeout(promise, timeoutMs) {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("judge timeout")), timeoutMs);
-    promise.then((value) => {
-      clearTimeout(timer);
-      resolve(value);
-    }, (error) => {
-      clearTimeout(timer);
-      reject(error);
-    });
-  });
-}
-async function runJudgeWithPrompt(changes, config, runner, buildPrompt) {
-  if (!config.enabled)
-    return [];
-  const prompt = buildPrompt(changes);
-  if (prompt.length === 0)
-    return [];
-  try {
-    const raw = await withTimeout(runner(prompt, config.model), config.timeoutMs ?? 30000);
-    return parseJudgeResponse(raw);
-  } catch {
-    return [];
-  }
-}
-function parseModel(model) {
-  if (!model)
-    return;
-  const separator = model.indexOf("/");
-  if (separator <= 0 || separator === model.length - 1)
-    return;
-  return { providerID: model.slice(0, separator), modelID: model.slice(separator + 1) };
-}
-function createModelJudgeRunner(client, directory) {
-  const session = client?.session;
-  return async (prompt, model) => {
-    if (!session?.create || !session?.prompt)
-      return "";
-    const modelRef = parseModel(model);
-    try {
-      const created = await session.create({ body: { title: "test-guard judge" }, query: { directory } });
-      const id = created?.data?.id;
-      if (!id)
-        return "";
-      try {
-        const result = await session.prompt({
-          path: { id },
-          query: { directory },
-          body: {
-            system: JUDGE_SYSTEM,
-            tools: { bash: false, edit: false, write: false, read: false, webfetch: false, patch: false, task: false },
-            ...modelRef ? { model: modelRef } : {},
-            parts: [{ type: "text", text: prompt }]
-          }
-        });
-        const parts = result?.data?.parts ?? [];
-        return parts.filter((part) => part.type === "text" && typeof part.text === "string").map((part) => part.text).join(`
-`);
-      } finally {
-        try {
-          await session.delete?.({ path: { id }, query: { directory } });
-        } catch {}
-      }
-    } catch {
-      return "";
-    }
-  };
-}
-function createDiffJudge(options) {
-  return createIdleAdvisory({
-    isEnabled: () => options.getConfig().enabled,
-    cooldownMs: options.cooldownMs,
-    disabledMessage: options.disabledMessage,
-    unavailableMessage: options.unavailableMessage,
-    emptyMessage: options.emptyMessage,
-    analyze: async () => {
-      const changes = options.selectChanges(options.directory, options.base ?? "HEAD");
-      const findings = await runJudgeWithPrompt(changes, options.getConfig(), options.runner, options.buildPrompt);
-      return findings.length > 0 ? options.format(findings) : null;
-    }
-  });
-}
-function createJudge(options) {
-  return createDiffJudge({
-    directory: options.directory,
-    getConfig: options.getConfig,
-    runner: options.runner,
-    cooldownMs: options.cooldownMs,
-    selectChanges: (directory, base) => changedTestChanges(directory, base, options.getTestPatterns()),
-    buildPrompt: buildJudgePrompt,
-    format: formatJudgeFindings,
-    ...idleMessages("LLM judge", "set test_guard.judge.enabled", "no findings")
-  });
-}
-function createGuardJudgeTool(judge) {
-  return createAdvisoryTool("Run the opt-in LLM judge over the current test diff. Read-only and advisory; requires test_guard.judge.enabled.", judge);
-}
-function buildCommentJudgePrompt(changes) {
-  const sections = [];
-  for (const change of changes) {
-    const addedComments = change.addedLines.filter((line) => isCommentLine(line, change.language));
-    if (addedComments.length === 0)
-      continue;
-    const lines = change.newText.split(`
-`);
-    const used = new Set;
-    const body = [];
-    for (const comment of addedComments) {
-      const index = lines.findIndex((line, i) => !used.has(i) && line === comment);
-      if (index >= 0)
-        used.add(index);
-      body.push(`+ ${index >= 0 ? index + 1 : 0}: ${comment}`);
-    }
-    sections.push(`--- ${change.filePath}
-${body.join(`
-`)}`);
-  }
-  if (sections.length === 0)
-    return "";
-  return [
-    "Review the following newly added comments and decide whether any should be removed",
-    "because it restates the code, is an agent memo (// now, // changed, // updated),",
-    "a TODO/FIXME without an owner, or commented-out code, rather than explaining WHY",
-    "(business rule, security, performance, regex/math, public API).",
-    "Reply with ONLY a JSON array. Each item:",
-    '{"file": "<path>", "line": <number>, "reason": "<short>", "confidence": "high|medium|low"}.',
-    "If every comment is worth keeping, reply with [].",
-    "",
-    sections.join(`
-
-`)
-  ].join(`
-`);
-}
-function formatCommentJudgeFindings(findings) {
-  return `Comment relevance judge (advisory, opt-in):
-${judgeFindingLines(findings)}`;
-}
-function createCommentJudge(options) {
-  return createDiffJudge({
-    directory: options.directory,
-    getConfig: options.getConfig,
-    runner: options.runner,
-    cooldownMs: options.cooldownMs,
-    selectChanges: (directory, base) => diffChanges(directory, base).filter((change) => isSupportedLanguage(change.language)),
-    buildPrompt: buildCommentJudgePrompt,
-    format: formatCommentJudgeFindings,
-    ...idleMessages("Comment relevance judge", "set comment_checker.judge.enabled", "no findings")
-  });
-}
-function createGuardCommentJudgeTool(judge) {
-  return createAdvisoryTool("Run the opt-in comment relevance judge over the current diff. Read-only and advisory; requires comment_checker.judge.enabled.", judge);
-}
-
 // src/core/parser-adapter.ts
 function buildParserPayload(changes) {
   const files = [];
@@ -4667,10 +4457,6 @@ function resolveAdapterBase(target, envPrefix, inputs) {
   target.enabled = resolveOption(asOptionalBoolean, `${envPrefix}_ENABLED`, "enabled", inputs) ?? false;
   target.timeoutMs = resolveOption((value) => asCount(value, 1), `${envPrefix}_TIMEOUT_MS`, "timeout_ms", inputs);
 }
-function resolveJudge(target, envPrefix, inputs) {
-  resolveAdapterBase(target, envPrefix, inputs);
-  target.model = resolveJudgeModel(resolveOption(asString, `${envPrefix}_MODEL`, "model", inputs));
-}
 function resolveCommandAdapter(target, envPrefix, inputs) {
   resolveAdapterBase(target, envPrefix, inputs);
   target.command = resolveOption(asString, `${envPrefix}_COMMAND`, "command", inputs);
@@ -4691,7 +4477,6 @@ function resolveConfiguration(config) {
   resolvedCommentConfig.paths = resolveOption(asPatterns, "COMMENT_CHECKER_PATHS", "paths", inputs) ?? [];
   resolvedCommentConfig.timeoutMs = resolveOption((value) => asCount(value, 1), "COMMENT_CHECKER_TIMEOUT_MS", "timeout_ms", inputs) ?? DEFAULT_CLI_TIMEOUT_MS;
   resolvedCommentConfig.keywordAcquit = resolveOption(asKeywordAcquit, "COMMENT_CHECKER_KEYWORD_ACQUIT", "keyword_acquit", inputs) ?? "proven-only";
-  resolveJudge(resolvedCommentJudge, "COMMENT_CHECKER_JUDGE", subConfigInputs(options, fromConfig, "judge"));
 }
 var resolvedTestGuard = {
   enabled: true,
@@ -4703,8 +4488,6 @@ var resolvedTestGuard = {
   engine: "binary"
 };
 var resolvedMutation = { enabled: false };
-var resolvedJudge = { enabled: false };
-var resolvedCommentJudge = { enabled: false };
 var resolvedParser = { enabled: false };
 function resolveTestGuardConfiguration(config) {
   const options = optionContainer(pluginOptions, "test_guard");
@@ -4715,7 +4498,6 @@ function resolveTestGuardConfiguration(config) {
   resolvedTestGuard.testCommand = resolveOption(asString, "TEST_GUARD_TEST_COMMAND", "test_command", inputs) ?? detectTestCommand(projectDirectory);
   resolvedTestGuard.engine = resolveOption(asEngine, "TEST_GUARD_ENGINE", "engine", inputs) ?? "binary";
   resolveCommandAdapter(resolvedMutation, "TEST_GUARD_MUTATION", subConfigInputs(options, fromConfig, "mutation"));
-  resolveJudge(resolvedJudge, "TEST_GUARD_JUDGE", subConfigInputs(options, fromConfig, "judge"));
   resolveCommandAdapter(resolvedParser, "TEST_GUARD_PARSER", subConfigInputs(options, fromConfig, "parser"));
   resolvedTestGuard.checks = resolveRuleConfig(DEFAULT_TEST_CHECKS, {
     envPrefix: "TEST_GUARD_",
@@ -4737,19 +4519,6 @@ async function createHooks(input, options) {
   const testGuard = createTestGuard(() => resolvedTestGuard);
   const auditTool = createGuardAuditTool({ directory: projectDirectory, getConfig: () => resolvedTestGuard });
   const cleanupTool = createGuardCleanupTool({ directory: projectDirectory, getConfig: () => resolvedTestGuard });
-  const judge = createJudge({
-    directory: projectDirectory,
-    getConfig: () => resolvedJudge,
-    getTestPatterns: () => resolvedTestGuard.testPatterns,
-    runner: createModelJudgeRunner(input.client, projectDirectory)
-  });
-  const judgeTool = createGuardJudgeTool(judge);
-  const commentJudge = createCommentJudge({
-    directory: projectDirectory,
-    getConfig: () => resolvedCommentJudge,
-    runner: createModelJudgeRunner(input.client, projectDirectory)
-  });
-  const commentJudgeTool = createGuardCommentJudgeTool(commentJudge);
   const parser = createParserAdapter({
     directory: projectDirectory,
     getConfig: () => resolvedParser,
@@ -4759,17 +4528,13 @@ async function createHooks(input, options) {
   const mutation = createMutationAdapter({ getConfig: () => resolvedMutation });
   const analyzers = new AnalyzerRegistry;
   analyzers.register(createIdleAnalyzer("mutation", mutation));
-  analyzers.register(createIdleAnalyzer("test-judge", judge));
   analyzers.register(createIdleAnalyzer("parser", parser));
-  analyzers.register(createIdleAnalyzer("comment-judge", commentJudge));
   const advisories = new AdvisoryQueue;
   return {
     tool: {
       guard_audit: auditTool,
       guard_cleanup: cleanupTool,
-      guard_judge: judgeTool,
-      guard_parse: parseTool,
-      guard_comment_judge: commentJudgeTool
+      guard_parse: parseTool
     },
     event: async ({ event }) => {
       if (event.type !== "session.idle")
@@ -4797,7 +4562,7 @@ var CommentCheckerPlugin = Plugin.define({
   async setup(ctx) {
     const client = {
       session: {
-        create: async () => ({ data: { id: "opencode-guard-plugin-judge" } }),
+        create: async () => ({ data: { id: "opencode-guard-plugin-parser" } }),
         prompt: async (request) => {
           const body = request?.body ?? {};
           const system = typeof body.system === "string" ? body.system : "";

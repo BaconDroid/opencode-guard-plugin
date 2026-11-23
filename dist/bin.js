@@ -2597,13 +2597,7 @@ function validateCommentChecker(record, path, errors) {
   if (record.keyword_acquit !== undefined && asKeywordAcquit(record.keyword_acquit) === undefined) {
     errors.push(`${path}.keyword_acquit must be one of proven-only, never`);
   }
-  if (record.judge !== undefined) {
-    if (!isRecord(record.judge))
-      errors.push(`${path}.judge must be an object`);
-    else
-      validateJudge(record.judge, `${path}.judge`, errors);
-  }
-  rejectUnknown(record, ["enabled", "custom_prompt", "append_prompt", "max_warnings_per_file", "dedup_window_ms", "timeout_ms", "tools", "paths", "keyword_acquit", "judge"], path, errors);
+  rejectUnknown(record, ["enabled", "custom_prompt", "append_prompt", "max_warnings_per_file", "dedup_window_ms", "timeout_ms", "tools", "paths", "keyword_acquit"], path, errors);
 }
 function validateTestGuard(record, path, errors) {
   if (record.enabled !== undefined && typeof record.enabled !== "boolean")
@@ -2648,12 +2642,6 @@ function validateTestGuard(record, path, errors) {
     else
       validateMutation(record.mutation, `${path}.mutation`, errors);
   }
-  if (record.judge !== undefined) {
-    if (!isRecord(record.judge))
-      errors.push(`${path}.judge must be an object`);
-    else
-      validateJudge(record.judge, `${path}.judge`, errors);
-  }
   if (record.parser !== undefined) {
     if (!isRecord(record.parser))
       errors.push(`${path}.parser must be an object`);
@@ -2672,7 +2660,6 @@ function validateTestGuard(record, path, errors) {
     "tools",
     "engine",
     "mutation",
-    "judge",
     "parser"
   ], path, errors);
 }
@@ -2685,16 +2672,6 @@ function validateMutation(record, path, errors) {
     errors.push(`${path}.timeout_ms must be an integer >= 1`);
   }
   rejectUnknown(record, ["enabled", "command", "timeout_ms"], path, errors);
-}
-function validateJudge(record, path, errors) {
-  if (record.enabled !== undefined && typeof record.enabled !== "boolean")
-    errors.push(`${path}.enabled must be a boolean`);
-  if (record.model !== undefined && asString(record.model) === undefined)
-    errors.push(`${path}.model must be a non-empty string`);
-  if (record.timeout_ms !== undefined && asCount(record.timeout_ms, 1) === undefined) {
-    errors.push(`${path}.timeout_ms must be an integer >= 1`);
-  }
-  rejectUnknown(record, ["enabled", "model", "timeout_ms"], path, errors);
 }
 function validateParser(record, path, errors) {
   if (record.enabled !== undefined && typeof record.enabled !== "boolean")

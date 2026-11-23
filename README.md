@@ -72,7 +72,6 @@ Available options (all under `comment_checker`):
 | `keyword_acquit` | `"proven-only"` or `"never"` | `"proven-only"` | How a prose keyword may acquit a comment: `proven-only` lets the CLI decide, `never` leaves only its structural classes. |
 | `timeout_ms` | number | `5000` | How long to wait for the CLI before ignoring it. |
 | `append_prompt` | string | unset | Opt-in text appended after the warning, keeping the default (or `custom_prompt`) message intact. |
-| `judge` | object | `{"enabled": false}` | Comment relevance judge: `enabled`, `model` (default `opencode/big-pickle`), `timeout_ms` (default `30000`). See [Comment relevance judge](#comment-relevance-judge-opt-in). |
 
 Keep the default CLI warning and add your own line to it, for example:
 
@@ -128,27 +127,6 @@ Detection is local and deterministic (tree-sitter parsing in the `comment-checke
 
 Directive and shebang handling is heuristic: `biome-ignore`, for example, is currently flagged.
 
-### Comment relevance judge (opt-in)
-
-If `comment_checker.judge.enabled` is set, the plugin reviews the newly added
-comments with `comment_checker.judge.model` (same default as the test judge,
-`opencode/big-pickle`) inside a sandboxed session, on `session.idle` (at most
-once per minute per session) and on demand via the `guard_comment_judge` tool.
-It flags comments that restate the code, agent memos, ownerless TODO/FIXME or
-commented-out code. Advisory only, fail-open, disabled by default. When enabled,
-the added comment lines (not the whole repo) are sent to the configured model.
-
-```json
-{
-  "plugin": [
-    ["opencode-guard-plugin", { "comment_checker": { "judge": { "enabled": true, "model": "opencode/big-pickle" } } }]
-  ]
-}
-```
-
-Env: `COMMENT_CHECKER_JUDGE_ENABLED`, `COMMENT_CHECKER_JUDGE_MODEL`,
-`COMMENT_CHECKER_JUDGE_TIMEOUT_MS`.
-
 ## Test guard
 
 The plugin also ships a deterministic **test guard** that discourages weakening
@@ -164,7 +142,6 @@ tests. It reuses the same tuple, under a sibling `test_guard` key:
         "engine": "binary",
         "checks": { "protected-paths": "warn", "skip-focus-added": "warn" },
         "mutation": { "enabled": false, "command": "npx stryker run --reporters json", "timeout_ms": 120000 },
-        "judge": { "enabled": false, "model": "opencode/big-pickle", "timeout_ms": 30000 },
         "parser": { "enabled": false, "command": "my-ast-check --json", "timeout_ms": 30000 }
       }
     }]
@@ -341,8 +318,7 @@ Env vars mirror the comment guard: `TEST_GUARD_ENABLED`,
 `TEST_GUARD_CUSTOM_PROMPT`,
 `TEST_GUARD_APPEND_PROMPT`, `TEST_GUARD_MUTATION_ENABLED`,
 `TEST_GUARD_MUTATION_COMMAND`, `TEST_GUARD_MUTATION_TIMEOUT_MS`,
-`TEST_GUARD_JUDGE_ENABLED`, `TEST_GUARD_JUDGE_MODEL`,
-`TEST_GUARD_JUDGE_TIMEOUT_MS`, `TEST_GUARD_PARSER_ENABLED`,
+`TEST_GUARD_PARSER_ENABLED`,
 `TEST_GUARD_PARSER_COMMAND`, `TEST_GUARD_PARSER_TIMEOUT_MS`, and
 `TEST_GUARD_CHECK_<RULE>` (env > tuple options).
 `TEST_CHECKER_VERSION` pins the installed `test-checker` binary version.
@@ -355,18 +331,6 @@ a `mutation.command` (Stryker, mutmut, PIT, …), it runs on `session.idle`
 `files[].mutants[]` or a generic `{ "survivors": [...] }`) and queues the
 survivors for the next tool call's output. Disabled by default, fail-open,
 never runs a destructive command.
-
-### LLM judge (opt-in, phase 2B)
-
-If `judge.enabled` is set, the plugin reviews the current test diff with
-`judge.model` (default `opencode/big-pickle`, a free OpenCode Zen model; set it
-to `host` to reuse the model opencode is already configured with),
-inside a sandboxed session with tools disabled, on `session.idle` (at most once
-per minute per session) and on demand via the `guard_judge` tool. It returns
-**advisory** findings only, is fail-open, and never handles provider
-credentials — the model and keys stay in opencode. Note that, when enabled,
-the test diff (test code only, not the whole repo) is sent to the configured
-model. Disabled by default.
 
 ### External parser adapter (opt-in)
 
