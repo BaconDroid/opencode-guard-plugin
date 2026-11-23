@@ -421,6 +421,12 @@ the proven tier, `balanced` adds the audited heuristics, and `aggressive` also
 takes the low-confidence telemetry such as `echo-test` and
 `mirror-implementation-test`. `guard cleanup --strip-policy <level>` overrides it
 for a single run.
+
+The flag only has an effect on a `test-checker` build that implements
+`--strip-policy`. The released 0.4.0 ignores the unknown argument and removes
+every approved candidate, which is what `aggressive` asks for and why this
+install's opt-in stays correct on it; `conservative` and `balanced` need the next
+release, or `TC_BINARY` pointed at a build from source.
 Harness/config files are selected by the shared gate and listed as skipped
 because `--strip` runs on test bodies. It exits 0 on success, including when
 nothing was approved or removed. A missing binary is reported and treated as a
