@@ -1,4 +1,4 @@
-// Shared plumbing for opt-in advisory analyzers (judge, external parser):
+// Shared plumbing for opt-in advisory analyzers (mutation, external parser):
 // per-session cooldown, on-idle and on-demand entry points, and the tool
 // wrapper. The analyzer itself only provides `analyze`.
 

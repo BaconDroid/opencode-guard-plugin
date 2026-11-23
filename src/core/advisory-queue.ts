@@ -1,4 +1,4 @@
-// Advisory notes produced by the idle analyzers (mutation, judges, parser).
+// Advisory notes produced by the idle analyzers (mutation, external parser).
 // The queue is owned by the plugin, not by a guard, so a note surfaces on the
 // next tool call regardless of which guard is enabled.
 
